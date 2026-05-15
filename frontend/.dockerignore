@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.gitignore
+*.log
+README.md
+Dockerfile
+.dockerignore
+.env
+.env.local
+.env.*.local
+tsconfig.tsbuildinfo
+public/audio
+public/images
+public/sheets
+public/uploads

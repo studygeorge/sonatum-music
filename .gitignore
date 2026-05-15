@@ -1,0 +1,54 @@
+# Secrets
+secrets.env
+*.env
+!*.env.example
+!secrets.env.example
+
+# Media uploads (1.1 GB, bind-mounted)
+data/
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Next.js build artifacts
+.next/
+**/.next/
+out/
+
+# Logs
+*.log
+logs/
+build.log
+build2.log
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
+
+# Prisma generated client
+**/node_modules/.prisma/
+**/node_modules/@prisma/client/
+
+# Misc
+*.pid
+*.seed
+*.tgz
+.npm
+.cache/
+.parcel-cache/
+
+# Temp
+tmp/
+temp/
+*.tmp
+
+# Local docker volumes
+postgres-data/
+
+# Old extracted binary
+backend/lrt

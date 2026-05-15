@@ -1,0 +1,75 @@
+name: sonatum
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: sonatum/backend:latest
+    container_name: sonatum-backend
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ./secrets.env
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOSTNAME: 0.0.0.0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:3011:3001"
+    volumes:
+      - ./data/audio:/app/public/audio
+      - ./data/images:/app/public/images
+      - ./data/sheets:/app/public/sheets
+      - ./data/uploads:/app/public/uploads
+    networks:
+      - sonatum_net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: sonatum/frontend:latest
+    container_name: sonatum-frontend
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://sonatum-music.ru}
+      NEXT_PUBLIC_TELEGRAM_BOT_NAME: ${NEXT_PUBLIC_TELEGRAM_BOT_NAME:-sonatumbot}
+    ports:
+      - "127.0.0.1:3010:3000"
+    volumes:
+      - ./data/audio:/app/public/audio:ro
+      - ./data/images:/app/public/images:ro
+      - ./data/sheets:/app/public/sheets:ro
+      - ./data/uploads:/app/public/uploads:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - sonatum_net
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
+networks:
+  sonatum_net:
+    driver: bridge

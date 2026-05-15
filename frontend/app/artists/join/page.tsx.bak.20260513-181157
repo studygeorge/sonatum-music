@@ -1,0 +1,32 @@
+import RequestForm from '@/app/components/RequestForm';
+
+export default function ArtistsJoinPage() {
+  return (
+    <main className="min-h-screen pt-10 md:pt-14 pb-24 px-6 md:px-12 max-w-4xl mx-auto">
+      <div className="text-center mb-10">
+        <h1 className="text-4xl lg:text-5xl font-bold tracking-tight mb-3">Артистам</h1>
+        <p className="text-lg text-[var(--text-secondary)] max-w-2xl mx-auto">
+          Опубликуйте свои произведения и ноты на «Сонатум». Мы помогаем
+          российским композиторам и исполнителям найти своих слушателей и получать
+          отчисления за прослушивания.
+        </p>
+      </div>
+
+      <RequestForm
+        type="ARTIST"
+        title="Заявка на публикацию"
+        description="Заполните форму — мы свяжемся для подключения вашего профиля автора и разъяснения лицензионных условий."
+        fields={[
+          { kind: 'text',  name: 'name',      label: 'Сценическое имя / название коллектива', required: true },
+          { kind: 'email', name: 'email',     label: 'Email', required: true },
+          { kind: 'tel',   name: 'phone',     label: 'Телефон' },
+          { kind: 'text',  name: 'genre',     label: 'Жанр / стиль' },
+          { kind: 'text',  name: 'links',     label: 'Ссылки на ваши треки (SoundCloud, YouTube, VK и т.д.)' },
+          { kind: 'textarea', name: 'about',  label: 'О себе и проекте', required: true,
+            placeholder: 'Краткая биография, дискография, права на материал…' },
+        ]}
+        submitLabel="Отправить заявку"
+      />
+    </main>
+  );
+}

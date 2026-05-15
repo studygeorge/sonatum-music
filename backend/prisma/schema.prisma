@@ -1,0 +1,859 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ПОЛЬЗОВАТЕЛИ И АУТЕНТИФИКАЦИЯ
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime? @db.Timestamptz(3)
+  username      String?   @unique
+  passwordHash  String
+
+  firstName String?
+  lastName  String?
+  avatar    String?
+  bio       String? @db.Text
+  balance   Decimal @default(0) @db.Decimal(10, 2)
+
+  role   UserRole   @default(USER)
+  status UserStatus @default(ACTIVE)
+
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  lastLoginAt DateTime? @db.Timestamptz(3)
+
+  // Новые поля
+  nickname          String?
+  regionId          String?
+  region            Region? @relation(fields: [regionId], references: [id], onDelete: SetNull)
+  favoriteGenres    Json?   @db.JsonB
+  favoriteEras      Json?   @db.JsonB
+  favoriteComposers Json?   @db.JsonB
+  privacySettings   Json?   @db.JsonB
+
+  // Связи
+  sessions       Session[]
+  playlists      Playlist[]
+  purchases      Purchase[]
+  transactions   Transaction[]
+  sheetDownloads SheetMusicDownload[] @relation("UserDownloads")
+  // Edu Groups
+  ownedGroups  EduGroup[]       @relation("GroupOwner")
+  joinedGroups EduGroupMember[] @relation("GroupMember")
+
+  likedTracks   LikedTrack[]
+  artistProfile Artist?
+  artistFollows ArtistFollow[]
+
+  verificationTokens VerificationToken[]
+
+  // Связи с новыми моделями
+  collective      Collective?     @relation("CollectiveLeader")
+  subscription    Subscription?
+  b2bRequests     B2BRequest[]
+  trackActivity   TrackActivity[]
+  uploadedSheets  SheetMusic[]    @relation("SheetUploader")
+  annotations     Annotation[]
+  comments        Comment[]
+  commentLikes    CommentLike[]
+  reportsMade     Report[]
+  reportsReceived Report[]        @relation("UserReports")
+
+  @@index([email])
+  @@index([username])
+  @@index([role])
+  @@index([status])
+  @@index([regionId])
+  @@map("users")
+}
+
+enum UserRole {
+  USER // Обычный пользователь (слушает музыку, создает плейлисты)
+  ARTIST // Артист (загружает свою музыку, продает треки)
+  ADMIN // Администратор (модерация, управление контентом)
+  SUPER_ADMIN // Суперадмин (полный доступ ко всему)
+}
+
+enum UserStatus {
+  ACTIVE // Активный
+  SUSPENDED // Заблокирован
+  PENDING // Ожидает подтверждения email
+  DELETED // Удален
+}
+
+// СЕССИИ
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  ipAddress String?
+  userAgent String?  @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// АРТИСТЫ
+model Artist {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  slug        String  @unique
+  bio         String? @db.Text
+  avatar      String?
+  coverImage  String?
+  verified    Boolean @default(false)
+  followers   Int     @default(0)
+  region      String?
+  city        String?
+  foundedYear Int?
+  socialLinks Json?   @db.JsonB
+
+  // Настройки продажи
+  canSellMusic Boolean @default(false)
+  paymentInfo  Json?   @db.JsonB
+
+  // Дополнительно
+  authorType             AuthorType @default(BOTH)
+  isSelfEmployedVerified Boolean    @default(false)
+  defaultLicenses        Json?      @db.JsonB
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  tracks               Track[]
+  albums               Album[]
+  genres               ArtistGenre[]
+  sheetMusicAsComposer SheetMusic[]
+  sheetMusicAsArranger SheetMusic[]  @relation("SheetArranger")
+  Region               Region?       @relation(fields: [regionId], references: [id])
+  regionId             String?
+  followedBy           ArtistFollow[]
+
+  @@index([slug])
+  @@index([userId])
+  @@index([region])
+  @@index([verified])
+  @@map("artists")
+}
+
+model ArtistFollow {
+  userId    String
+  artistId  String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@id([userId, artistId])
+  @@index([userId])
+  @@index([artistId])
+  @@map("artist_follows")
+}
+
+enum AuthorType {
+  COMPOSER
+  PERFORMER
+  BOTH
+}
+
+// ЖАНРЫ
+model Genre {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  slug        String  @unique
+  description String? @db.Text
+  color       String? @db.VarChar(7)
+  icon        String? @db.VarChar(10)
+  parentId    String?
+  parent      Genre?  @relation("GenreHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subgenres   Genre[] @relation("GenreHierarchy")
+
+  artists ArtistGenre[]
+  tracks  TrackGenre[]
+
+  @@index([slug])
+  @@index([parentId])
+  @@map("genres")
+}
+
+model ArtistGenre {
+  artistId String
+  genreId  String
+  artist   Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  genre    Genre  @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([artistId, genreId])
+  @@index([artistId])
+  @@index([genreId])
+  @@map("artist_genres")
+}
+
+// АЛЬБОМЫ
+model Album {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  cover       String?
+  releaseDate DateTime? @db.Date
+  artistId    String
+  artist      Artist    @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  trackCount  Int       @default(0)
+  duration    Int       @default(0)
+
+  status ContentStatus @default(DRAFT)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  tracks Track[]
+
+  @@index([slug])
+  @@index([artistId])
+  @@index([releaseDate])
+  @@index([status])
+  @@map("albums")
+}
+
+// ТРЕКИ
+model Track {
+  id           String  @id @default(cuid())
+  title        String
+  slug         String  @unique
+  duration     Int
+  audioUrl     String
+  waveformData Json?   @db.JsonB
+  cover        String?
+  lyrics       String? @db.Text
+  bpm          Int?
+  key          String? @db.VarChar(10)
+
+  // Продажа
+  price       Decimal? @db.Decimal(10, 2)
+  isFree      Boolean  @default(false)
+  isForSale   Boolean  @default(false)
+  downloadUrl String?
+  format      String?  @db.VarChar(10)
+
+  // Метаданные
+  artistId      String
+  albumId       String?
+  playCount     Int       @default(0)
+  likeCount     Int       @default(0)
+  purchaseCount Int       @default(0)
+  releaseDate   DateTime? @db.Date
+  isExplicit    Boolean   @default(false)
+
+  status ContentStatus @default(DRAFT)
+
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  publishedAt DateTime? @db.Timestamptz(3)
+
+  // Метаданные дополнительные
+  sourceUrl           String?
+  licenseType         String?
+  attributionRequired Boolean @default(false)
+  metadata            Json?   @db.JsonB
+
+  // Дополнительные поля каталога
+  eraId       String?
+  language    String?
+  confession  String?
+  chantType   String?
+  serviceType String?
+
+  artist      Artist          @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  album       Album?          @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  genres      TrackGenre[]
+  tags        TrackTag[]
+  purchases   Purchase[]
+  likedBy     LikedTrack[]
+  inPlaylists PlaylistTrack[]
+
+  // Связи с новыми моделями
+  sheetMusic    SheetMusic?
+  comments      Comment[]
+  reports       Report[]
+  trackActivity TrackActivity[]
+  b2bRequests   B2BRequest[]
+
+  @@index([slug])
+  @@index([artistId])
+  @@index([albumId])
+  @@index([playCount(sort: Desc)])
+  @@index([likeCount(sort: Desc)])
+  @@index([releaseDate(sort: Desc)])
+  @@index([price])
+  @@index([isFree])
+  @@index([isForSale])
+  @@index([status])
+  @@map("tracks")
+}
+
+enum ContentStatus {
+  DRAFT // Черновик
+  PENDING // На модерации
+  PUBLISHED // Опубликовано
+  REJECTED // Отклонено
+  ARCHIVED // Архивировано
+}
+
+model TrackGenre {
+  trackId String
+  genreId String
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  genre   Genre  @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([trackId, genreId])
+  @@index([trackId])
+  @@index([genreId])
+  @@map("track_genres")
+}
+
+// ТЕГИ
+model Tag {
+  id     String     @id @default(cuid())
+  name   String     @unique
+  slug   String     @unique
+  tracks TrackTag[]
+
+  @@index([slug])
+  @@map("tags")
+}
+
+model TrackTag {
+  trackId String
+  tagId   String
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([trackId, tagId])
+  @@index([trackId])
+  @@index([tagId])
+  @@map("track_tags")
+}
+
+// ПЛЕЙЛИСТЫ
+model Playlist {
+  id          String       @id @default(cuid())
+  title       String
+  slug        String       @unique
+  description String?      @db.Text
+  cover       String?
+  isPublic    Boolean      @default(true)
+  type        PlaylistType @default(USER)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  trackCount Int @default(0)
+  duration   Int @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  tracks PlaylistTrack[]
+
+  @@index([slug])
+  @@index([userId])
+  @@index([isPublic])
+  @@index([type])
+  @@map("playlists")
+}
+
+enum PlaylistType {
+  USER
+  EDITORIAL
+  AI_GENERATED
+  CHART
+}
+
+model PlaylistTrack {
+  playlistId String
+  trackId    String
+  position   Int
+  addedAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track    Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@id([playlistId, trackId])
+  @@index([playlistId])
+  @@index([trackId])
+  @@map("playlist_tracks")
+}
+
+// ЛАЙКИ
+model LikedTrack {
+  userId  String
+  trackId String
+  likedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@id([userId, trackId])
+  @@index([userId])
+  @@index([trackId])
+  @@map("liked_tracks")
+}
+
+// ПОКУПКИ
+model Purchase {
+  id      String @id @default(cuid())
+  userId  String
+  trackId String
+
+  price    Decimal @db.Decimal(10, 2)
+  currency String  @default("RUB") @db.VarChar(3)
+
+  status PurchaseStatus @default(PENDING)
+
+  paymentId     String? @unique
+  paymentMethod String?
+
+  downloadUrl   String?
+  downloadCount Int     @default(0)
+  maxDownloads  Int     @default(3)
+
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
+  expiresAt   DateTime? @db.Timestamptz(3)
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([trackId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("purchases")
+}
+
+enum PurchaseStatus {
+  PENDING // Ожидает оплаты
+  COMPLETED // Оплачено
+  FAILED // Ошибка оплаты
+  REFUNDED // Возврат средств
+  CANCELLED // Отменено
+}
+
+// ==========================================
+// NEW MODELS AND FIELDS ADDED FOR SONATUM V2
+// ==========================================
+
+// РЕГИОНЫ (Интерактивная карта)
+model Region {
+  id                String  @id @default(cuid())
+  name              String  @unique
+  slug              String  @unique
+  type              String  @default("область") // край, республика, округ
+  centerCoordinates Json?   @db.JsonB // [lat, lng]
+  identityColor     String? // HEX для подсветки на карте
+
+  // Историческая справка (согласно КАРТА.md)
+  // Можно гранулярно (geography, roots, genres...) или одним Json'ом
+  historicalData Json? @db.JsonB
+
+  users   User[]
+  artists Artist[]
+
+  @@map("regions")
+}
+
+// КОЛЛЕКТИВЫ (АККАУНТЫ+ПОДПИСКА.md)
+model Collective {
+  id         String  @id @default(cuid())
+  name       String
+  slug       String  @unique
+  bio        String? @db.Text
+  avatar     String?
+  coverImage String?
+
+  leaderId String @unique // Пользователь, на которого зарегистрирован коллектив (Artist/User)
+  leader   User   @relation("CollectiveLeader", fields: [leaderId], references: [id])
+
+  // Здесь можно было бы добавить CollectiveMember, но пока достаточно просто связи со списком пользователей/строками
+  members Json? @db.JsonB // Список участников и их ролей
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("collectives")
+}
+
+// ПОДПИСКИ (АККАУНТЫ+ПОДПИСКА.md)
+model Subscription {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tier   SubscriptionTier   @default(FREE)
+  status SubscriptionStatus @default(ACTIVE)
+
+  startDate DateTime  @default(now()) @db.Timestamptz(3)
+  endDate   DateTime? @db.Timestamptz(3)
+
+  autoRenew Boolean @default(true)
+  price     Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([userId])
+  @@index([tier])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+enum SubscriptionTier {
+  FREE
+  PREMIUM
+  STUDENT
+  B2B
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+  PAST_DUE
+  PENDING
+}
+
+// B2B ЗАЯВКИ (АККАУНТЫ+ПОДПИСКА.md)
+model B2BRequest {
+  id String @id @default(cuid())
+
+  requesterId String? // Пользователь (если авторизован)
+  requester   User?   @relation(fields: [requesterId], references: [id], onDelete: SetNull)
+
+  companyName String?
+  email       String
+  phone       String?
+
+  requestType B2BRequestType
+
+  // Для лицензирования конкретного трека
+  trackId String?
+  track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
+
+  message String?          @db.Text
+  status  B2BRequestStatus @default(PENDING)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("b2b_requests")
+}
+
+enum B2BRequestType {
+  LICENSE // На трек
+  ACADEMIC // Для учебного заведения
+  OTHER
+}
+
+enum B2BRequestStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+}
+
+// АКТИВНОСТЬ ПРОСЛУШИВАНИЯ (Для "Вашей волны" и Чартов - ГЛАВНАЯ_ПЛЕЙЛИСТЫ_МУЗЫКА.md)
+model TrackActivity {
+  id     String  @id @default(cuid())
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  trackId String
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  durationListened Int // Сколько секунд прослушано
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([userId])
+  @@index([trackId])
+  @@index([createdAt])
+  @@map("track_activity")
+}
+
+// НОТНЫЙ АРХИВ (НОТНЫЙ_АРХИВ.md)
+model SheetMusic {
+  id      String  @id @default(cuid())
+  trackId String? @unique // Связь с аудио (если есть)
+  track   Track?  @relation(fields: [trackId], references: [id], onDelete: SetNull)
+
+  title      String // Название (может отличаться от трека, если загружены только ноты)
+  composerId String?
+  composer   Artist? @relation(fields: [composerId], references: [id], onDelete: SetNull)
+
+  pdfUrl          String // Ссылка на S3/storage
+  instrument      String // Скрипка, Фортепиано...
+  instrumentation String? // Скрипка и фортепиано
+  difficulty      SheetDifficulty @default(BEGINNER) // 1-5 класс
+
+  isPublicDomain Boolean  @default(false)
+  price          Decimal? @db.Decimal(10, 2)
+
+  verifyStatus   VerificationStatus @default(PENDING)
+
+  arrangerId     String?
+  arranger       Artist? @relation("SheetArranger", fields: [arrangerId], references: [id], onDelete: SetNull)
+
+  uploaderId     String
+  uploader       User   @relation("SheetUploader", fields: [uploaderId], references: [id])
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  annotations Annotation[]
+  downloads   SheetMusicDownload[]
+
+  @@map("sheet_music")
+}
+
+enum SheetDifficulty {
+  BEGINNER // 1-5 класс
+  INTERMEDIATE // 6-8 класс
+  ADVANCED // Училище, ВУЗ
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// АННОТАЦИИ К НОТАМ (НОТНЫЙ_АРХИВ.md)
+model Annotation {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sheetMusicId String
+  sheetMusic   SheetMusic @relation(fields: [sheetMusicId], references: [id], onDelete: Cascade)
+
+  pageNumber Int
+  positionX  Float
+  positionY  Float
+
+  content String @db.Text
+  color   String @default("#ffff00")
+
+  isShared      Boolean @default(false)
+  sharedGroupId String? // ID класса/группы для учебных заведений
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("annotations")
+}
+
+// КОММЕНТАРИИ (ОБЩЕЕ.md)
+model Comment {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  trackId String
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  content    String @db.Text
+  likesCount Int    @default(0)
+
+  parentId String?
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Comment[] @relation("CommentReplies")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  likes   CommentLike[]
+  reports Report[]
+
+  @@index([trackId])
+  @@index([userId])
+  @@index([parentId])
+  @@map("comments")
+}
+
+model CommentLike {
+  userId    String
+  commentId String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([userId, commentId])
+  @@map("comment_likes")
+}
+
+// ЖАЛОБЫ И МОДЕРАЦИЯ (ОБЩЕЕ.md)
+model Report {
+  id         String @id @default(cuid())
+  reporterId String
+  reporter   User   @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  targetType ReportTargetType
+  targetId   String // ID трека, коммента или пользователя
+
+  // Явные внешние ключи (nullable, так как таргет может быть разным)
+  track        Track?   @relation(fields: [targetId], references: [id], map: "fk_report_track", onDelete: Cascade)
+  comment      Comment? @relation(fields: [targetId], references: [id], map: "fk_report_comment", onDelete: Cascade)
+  reportedUser User?    @relation("UserReports", fields: [targetId], references: [id], map: "fk_report_user", onDelete: Cascade)
+
+  reason  ReportReason
+  details String?      @db.Text
+  status  ReportStatus @default(PENDING)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([status])
+  @@map("reports")
+}
+
+enum ReportTargetType {
+  TRACK
+  COMMENT
+  USER
+}
+
+enum ReportReason {
+  COPYRIGHT // Нарушение авторских прав
+  INAPPROPRIATE // Неприемлемый контент
+  METADATA // Неверные метаданные
+  TECHNICAL // Технические проблемы
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  REJECTED
+}
+
+// ТРАНЗАКЦИИ И СКАЧИВАНИЯ НОТ
+model SheetMusicDownload {
+  id           String   @id @default(cuid())
+  userId       String
+  sheetMusicId String
+  amountEarned Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  user       User       @relation("UserDownloads", fields: [userId], references: [id], onDelete: Cascade)
+  sheetMusic SheetMusic @relation(fields: [sheetMusicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sheetMusicId])
+  @@index([sheetMusicId])
+  @@index([userId])
+  @@map("sheet_music_downloads")
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  amount      Decimal  @db.Decimal(10, 2)
+  type        TransactionType
+  description String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("transactions")
+}
+
+enum TransactionType {
+  EARNING
+  WITHDRAWAL
+  PURCHASE
+}
+
+// ГРУППЫ ДЛЯ ОБУЧЕНИЯ (ПЕДАГОГИ / СТУДЕНТЫ)
+model EduGroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  ownerId     String
+  owner       User     @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  members     EduGroupMember[]
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  
+  @@map("edu_groups")
+}
+
+model EduGroupMember {
+  id       String   @id @default(cuid())
+  groupId  String
+  group    EduGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  
+  userId   String
+  user     User     @relation("GroupMember", fields: [userId], references: [id], onDelete: Cascade)
+  
+  joinedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([groupId, userId])
+  @@map("edu_group_members")
+}
+
+// ЖАЛОБЫ ПРАВООБЛАДАТЕЛЕЙ (анонимная форма с /legal/copyright)
+model CopyrightClaim {
+  id            String   @id @default(cuid())
+  claimantName  String
+  claimantOrg   String?
+  email         String
+  phone         String?
+  workTitle     String
+  workAuthor    String
+  infringingUrl String
+  description   String   @db.Text
+  ip            String?
+  status        String   @default("PENDING")
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+  @@map("copyright_claims")
+}
+
+
+// ТОКЕНЫ ДЛЯ EMAIL-ПОДТВЕРЖДЕНИЯ И СБРОСА ПАРОЛЯ
+// purpose: "VERIFY_EMAIL" | "PASSWORD_RESET"
+model VerificationToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   String
+  expiresAt DateTime  @db.Timestamptz(3)
+  usedAt    DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([userId])
+  @@index([purpose])
+  @@index([expiresAt])
+  @@map("verification_tokens")
+}

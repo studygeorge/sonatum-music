@@ -1,0 +1,282 @@
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
+import { api } from '@/app/lib/api';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+
+// Set standard worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+export default function SheetViewerPage({ params }: { params: { id: string } }) {
+  const [sheet, setSheet] = useState<any>(null);
+  const [annotations, setAnnotations] = useState<any[]>([]);
+  const [groups, setGroups] = useState<any[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+  const [annotationsOpen, setAnnotationsOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // PDF Viewer State
+  const [numPages, setNumPages] = useState<number>(1);
+  const [pageNumber, setPageNumber] = useState<number>(1);
+  const [addingAnnotation, setAddingAnnotation] = useState(false);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // 1. Fetch Sheet Music Details
+    api.getSheetMusic(params.id).then(res => {
+      if (res.success) setSheet(res.data);
+      // 2. Fetch Annotations
+      return api.getSheetAnnotations(params.id);
+    }).then(res => {
+      if (res?.success) setAnnotations(res.data);
+      // 3. Fetch Teacher Groups
+      return api.getGroups();
+    }).then(res => {
+      if (res?.success) setGroups(res.data);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [params.id]);
+
+  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    setNumPages(numPages);
+  };
+
+  const handleDownload = async () => {
+    // Call the monetization backend logic
+    const res = await fetch(`/api/sheets/${params.id}/download`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+    const result = await res.json();
+    if (result.success && result.downloadUrl) {
+      window.open(result.downloadUrl, '_blank');
+    } else {
+      alert(result.error || 'Ошибка скачивания');
+    }
+  };
+
+  const startAddingAnnotation = () => {
+    setAddingAnnotation(true);
+    setAnnotationsOpen(true);
+  };
+
+  const cancelAdding = () => {
+    setAddingAnnotation(false);
+  };
+
+  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!addingAnnotation || !containerRef.current) return;
+    
+    // Calculate relative X, Y in percentages based on the container size
+    const rect = containerRef.current.getBoundingClientRect();
+    const xPositions = ((e.clientX - rect.left) / rect.width) * 100;
+    const yPositions = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    // Prompt for text (simple implementation)
+    const content = window.prompt('Текст аннотации:');
+    if (!content) {
+      setAddingAnnotation(false);
+      return;
+    }
+
+    // Save annotation via API
+    api.addSheetAnnotation(params.id, {
+      pageNumber,
+      positionX: xPositions,
+      positionY: yPositions,
+      content,
+      color: '#ffff00',
+      isShared: !!selectedGroupId,
+      sharedGroupId: selectedGroupId || null
+    }).then(res => {
+      if (res.success) {
+        setAnnotations(prev => [...prev, res.data]);
+        setAddingAnnotation(false);
+      } else {
+        alert(res.error || 'Ошибка сохранения аннотации');
+      }
+    });
+  };
+
+  if (loading) return <div className="pt-32 text-center text-[var(--text-secondary)]">Загрузка партитуры...</div>;
+  if (!sheet) return <div className="pt-32 text-center text-red-500">Партитура не найдена.</div>;
+
+  const currentAnnotations = annotations.filter(a => a.pageNumber === pageNumber);
+
+  return (
+    <main className="min-h-screen pt-24 pb-12 flex flex-col">
+      <div className="border-b border-[var(--border)] bg-[var(--surface)] sticky top-[72px] z-30 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <div>
+            <h1 className="font-semibold text-lg">{sheet.title} (Страница {pageNumber} из {numPages})</h1>
+            <p className="text-sm text-[var(--text-secondary)]">
+              {sheet.composer?.name} • {sheet.instrument} 
+              {sheet.price && Number(sheet.price) > 0 ? ' • Premium' : ''}
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <button 
+              className={`apple-button-secondary text-sm ${addingAnnotation ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : ''}`} 
+              onClick={addingAnnotation ? cancelAdding : startAddingAnnotation}
+            >
+              {addingAnnotation ? 'Отмена (Кликните на ноты)' : 'Добавить пометку'}
+            </button>
+            <button 
+              className={`apple-button-secondary text-sm ${annotationsOpen ? 'bg-[var(--text-primary)] text-white' : ''}`}
+              onClick={() => setAnnotationsOpen(!annotationsOpen)}
+            >
+              Аннотации ({annotations.length})
+            </button>
+            <button className="apple-button text-sm" onClick={handleDownload}>Скачать (Водяной знак)</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-grow flex bg-gray-100/50 h-[calc(100vh-136px)] relative">
+        {/* PDF Viewer */}
+        <div className={`flex-grow overflow-auto p-4 md:p-8 flex flex-col items-center transition-all ${annotationsOpen ? 'mr-80' : ''}`}>
+          
+          {/* Pagination Controls */}
+          <div className="flex items-center gap-4 mb-4">
+            <button 
+              disabled={pageNumber <= 1} 
+              onClick={() => setPageNumber(p => p - 1)}
+              className="px-3 py-1 bg-white border border-gray-200 rounded-md disabled:opacity-50 text-sm"
+            >
+              ← Назад
+            </button>
+            <span className="text-sm text-gray-600">Стр. {pageNumber} из {numPages}</span>
+            <button 
+              disabled={pageNumber >= numPages} 
+              onClick={() => setPageNumber(p => p + 1)}
+              className="px-3 py-1 bg-white border border-gray-200 rounded-md disabled:opacity-50 text-sm"
+            >
+              Вперед →
+            </button>
+          </div>
+
+          {/* Interactive Document Area */}
+          <div 
+            ref={containerRef}
+            className={`relative bg-white shadow-xl transition-shadow ${addingAnnotation ? 'cursor-crosshair ring-2 ring-indigo-400' : ''}`}
+            onClick={handleContainerClick}
+          >
+            <Document 
+              file={sheet.pdfUrl} 
+              onLoadSuccess={onDocumentLoadSuccess}
+              loading={<div className="p-20 text-gray-500">Загрузка PDF...</div>}
+              error={<div className="p-20 text-red-500">Не удалось загрузить PDF</div>}
+            >
+              <Page 
+                pageNumber={pageNumber} 
+                width={800}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+              />
+            </Document>
+            
+            {/* Absolute Placed Annotations */}
+            {currentAnnotations.map(ann => (
+              <div 
+                key={ann.id}
+                className="absolute w-6 h-6 -ml-3 -mt-3 rounded-full flex items-center justify-center text-xs font-bold shadow-md ring-2 ring-white z-20 tooltip-trigger group cursor-pointer"
+                style={{ top: `${ann.positionY}%`, left: `${ann.positionX}%`, backgroundColor: ann.color }}
+              >
+                {/* ID mark */}
+                <span className="text-black/70">!</span>
+                
+                {/* Hover Popover */}
+                <div className="absolute hidden group-hover:block bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-3 bg-gray-900 text-white rounded-lg text-sm shadow-xl z-30">
+                  <div className="flex items-center gap-2 mb-2 border-b border-gray-700 pb-2">
+                    {ann.user?.avatar ? (
+                      <img src={ann.user.avatar} alt="Avatar" className="w-5 h-5 rounded-full" />
+                    ) : (
+                      <div className="w-5 h-5 bg-gray-600 rounded-full flex items-center justify-center text-[10px]">{ann.user?.firstName?.[0] || 'U'}</div>
+                    )}
+                    <span className="font-medium text-xs truncate">{ann.user?.firstName || ann.user?.username || 'Гость'}</span>
+                  </div>
+                  <p className="whitespace-pre-wrap leading-relaxed">{ann.content}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+        </div>
+
+        {/* Sidebar */}
+        {annotationsOpen && (
+          <div className="w-80 bg-white border-l border-[var(--border)] absolute right-0 top-0 bottom-0 shadow-[-10px_0_30px_rgba(0,0,0,0.03)] p-6 overflow-y-auto animate-fadeInRight z-40">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-semibold text-lg">Все аннотации ({annotations.length})</h3>
+              <button className="text-gray-400 hover:text-gray-800" onClick={() => setAnnotationsOpen(false)}>✕</button>
+            </div>
+            
+            {annotations.length === 0 ? (
+              <div className="text-center mt-10 p-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                <p className="text-gray-500 text-sm mb-3">Нет пометок на партитуре.</p>
+                <button className="text-blue-600 font-medium text-sm hover:underline" onClick={startAddingAnnotation}>
+                  + Добавить первую
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {annotations.map((ann) => (
+                  <div 
+                    key={ann.id} 
+                    className="p-4 bg-[var(--background)] rounded-xl border border-[var(--border)] transition hover:border-gray-300 cursor-pointer"
+                    onClick={() => setPageNumber(ann.pageNumber)}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center gap-2">
+                        {ann.user?.avatar ? (
+                          <img src={ann.user.avatar} alt="Avatar" className="w-6 h-6 rounded-full border border-gray-200" />
+                        ) : (
+                          <div className="w-6 h-6 bg-gray-200 text-gray-500 rounded-full flex items-center justify-center text-xs font-medium">
+                            {ann.user?.firstName?.[0] || 'U'}
+                          </div>
+                        )}
+                        <span className="font-medium text-xs">{ann.user?.firstName || ann.user?.username || 'Гость'}</span>
+                      </div>
+                      <span className="text-[10px] font-medium bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">Стр. {ann.pageNumber}</span>
+                    </div>
+                    <div className="text-sm text-gray-800 leading-relaxed bg-white p-3 rounded-lg border border-gray-100 shadow-sm relative pl-4">
+                      <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg" style={{ backgroundColor: ann.color }}></div>
+                      {ann.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div className="mt-8 pt-6 border-t border-[var(--border)] space-y-4">
+              <p className="text-xs text-[var(--text-secondary)]">
+                Аннотации — это часть инструментария для преподавателей и студентов (Premium / Edu доступ).
+              </p>
+              {groups.length > 0 && (
+                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                  <label className="block text-xs font-semibold text-indigo-900 mb-2">Отправить в учебную группу (класс)</label>
+                  <select 
+                    className="w-full p-2 text-sm rounded border border-indigo-200 bg-white"
+                    value={selectedGroupId}
+                    onChange={e => setSelectedGroupId(e.target.value)}
+                  >
+                    <option value="">Только для себя (Приватные)</option>
+                    {groups.map(g => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}

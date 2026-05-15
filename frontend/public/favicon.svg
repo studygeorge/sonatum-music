@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Сонатум">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"     stop-color="#ffffff"/>
+      <stop offset="0.333" stop-color="#ffffff"/>
+      <stop offset="0.333" stop-color="#0039a6"/>
+      <stop offset="0.666" stop-color="#0039a6"/>
+      <stop offset="0.666" stop-color="#d52b1e"/>
+      <stop offset="1"     stop-color="#d52b1e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Фон со скруглёнными углами и триколором -->
+  <rect x="0" y="0" width="64" height="64" rx="14" ry="14" fill="url(#bg)"/>
+  <!-- Бликовая подсветка -->
+  <circle cx="22" cy="20" r="22" fill="url(#glow)"/>
+
+  <!-- Монограмма «С» поверх флага: белый круг с тёмно-синей буквой -->
+  <g filter="url(#soft)">
+    <circle cx="32" cy="32" r="18" fill="#ffffff"/>
+    <text x="32" y="42.5"
+          text-anchor="middle"
+          font-family="Inter, -apple-system, Segoe UI, Helvetica, Arial, sans-serif"
+          font-weight="900"
+          font-size="28"
+          fill="#0039a6"
+          letter-spacing="-1">С</text>
+  </g>
+</svg>
