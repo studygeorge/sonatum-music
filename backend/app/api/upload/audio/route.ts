@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     } : 'NO FILE');
 
     const { artistSlug, trackSlug } = fields;
+    const kind: 'full' | 'instrumental' = fields.kind === 'instrumental' ? 'instrumental' : 'full';
 
     if (!file) {
       console.error(`[${timestamp}] [UPLOAD API] [${requestId}] ❌ No audio file in request`);
@@ -59,8 +60,8 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    console.error(`[${timestamp}] [UPLOAD API] [${requestId}] Step 4: Saving file to frontend/public...`);
-    const result = await saveAudioFile(file.buffer, file.filename, artistSlug, trackSlug);
+    console.error(`[${timestamp}] [UPLOAD API] [${requestId}] Step 4: Saving file (kind=${kind}) to frontend/public...`);
+    const result = await saveAudioFile(file.buffer, file.filename, artistSlug, trackSlug, kind);
 
     console.error(`[${timestamp}] [UPLOAD API] [${requestId}] ✅ UPLOAD COMPLETE!`);
     console.error(`[${timestamp}] [UPLOAD API] [${requestId}] Result:`, result);

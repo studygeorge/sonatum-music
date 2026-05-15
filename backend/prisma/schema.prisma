@@ -250,6 +250,11 @@ model Track {
   downloadUrl String?
   format      String?  @db.VarChar(10)
 
+  // Минусовка (инструментальная версия) — ТЗ Сонатум, раздел "Внедрение продажи минусовок"
+  audioType         AudioType @default(FULL)
+  instrumentalUrl   String?
+  instrumentalPrice Decimal?  @db.Decimal(10, 2)
+
   // Метаданные
   artistId      String
   albumId       String?
@@ -312,6 +317,13 @@ enum ContentStatus {
   PUBLISHED // Опубликовано
   REJECTED // Отклонено
   ARCHIVED // Архивировано
+}
+
+// Тип аудио-контента в треке (полная версия / только минусовка / обе версии)
+enum AudioType {
+  FULL          // Только полная версия (с вокалом или сольный инструментал)
+  INSTRUMENTAL  // Только минусовка
+  BOTH          // И полная версия, и минусовка (продаются отдельно)
 }
 
 model TrackGenre {

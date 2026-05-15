@@ -22,7 +22,10 @@ export async function POST(request: NextRequest) {
         albumId,
         genreIds,
         tagIds,
-        releaseDate
+        releaseDate,
+        audioType,
+        instrumentalUrl,
+        instrumentalPrice
       } = body;
 
       if (!title || !duration || !audioUrl) {
@@ -45,6 +48,17 @@ export async function POST(request: NextRequest) {
 
       const slug = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
 
+      // Валидация audioType — должно быть согласовано с наличием файлов
+      const normalizedAudioType: 'FULL' | 'INSTRUMENTAL' | 'BOTH' =
+        audioType === 'INSTRUMENTAL' || audioType === 'BOTH' ? audioType : 'FULL';
+
+      if (normalizedAudioType !== 'FULL' && !instrumentalUrl) {
+        return NextResponse.json(
+          { success: false, error: 'Для типа INSTRUMENTAL/BOTH требуется instrumentalUrl' },
+          { status: 400 }
+        );
+      }
+
       const track = await prisma.track.create({
         data: {
           title,
@@ -62,7 +76,13 @@ export async function POST(request: NextRequest) {
           artistId: artist.id,
           albumId,
           releaseDate: releaseDate ? new Date(releaseDate) : null,
-          status: 'PENDING'
+          status: 'PENDING',
+          audioType: normalizedAudioType,
+          instrumentalUrl: instrumentalUrl || null,
+          instrumentalPrice:
+            instrumentalPrice !== undefined && instrumentalPrice !== null && instrumentalPrice !== ''
+              ? Number(instrumentalPrice)
+              : null
         }
       });
 

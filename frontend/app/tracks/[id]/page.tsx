@@ -176,9 +176,46 @@ export default function TrackPage({ params }: { params: { id: string } }) {
            </div>
         </div>
         
+        {/* Минусовка (инструментальная версия) — ТЗ Сонатум */}
+        {track.audioType && track.audioType !== 'FULL' && track.instrumentalUrl && (
+          <div className="mb-8 apple-card p-5 bg-gradient-to-br from-[var(--hover)] to-white border border-[var(--border)]">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h3 className="text-[15px] font-bold text-[#1c1c1e] mb-0.5">
+                  {track.audioType === 'INSTRUMENTAL' ? 'Этот трек — минусовка' : 'Доступна минусовка'}
+                </h3>
+                <p className="text-[13px] text-[var(--text-secondary)]">
+                  Инструментальная версия без вокала{track.instrumentalPrice ? ` · ${Number(track.instrumentalPrice).toLocaleString('ru-RU')} ₽` : ''}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="px-5 py-2.5 rounded-full text-[14px] bg-[#e8e6e1] text-[#1c1c1e] hover:bg-[#dfdcd5] transition-colors font-bold"
+                  onClick={() => playTrack({ ...track, audioUrl: track.instrumentalUrl } as any)}
+                >
+                  ▶ Прослушать минусовку
+                </button>
+                {track.instrumentalPrice && Number(track.instrumentalPrice) > 0 && (
+                  <button
+                    className="px-5 py-2.5 rounded-full text-[14px] bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors font-bold"
+                    onClick={() => {
+                      const el = document.getElementById('license-marketplace');
+                      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}
+                  >
+                    Купить за {Number(track.instrumentalPrice).toLocaleString('ru-RU')} ₽
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* TrackTabs: О треке / Текст / Ноты */}
         <TrackTabs track={track} isPremium={isPremium} />
-        <LicenseMarketplace trackId={track.id} trackTitle={track.title} />
+        <div id="license-marketplace">
+          <LicenseMarketplace trackId={track.id} trackTitle={track.title} />
+        </div>
 
         {/* Comments */}
         <CommentsSection trackId={track.id} isPremium={isPremium} user={user} />

@@ -128,14 +128,15 @@ export function validateImageFile(file: {
   return { valid: true };
 }
 
-function generateSafeFilename(artistSlug: string, trackSlug: string, extension: string): string {
+function generateSafeFilename(artistSlug: string, trackSlug: string, extension: string, kind?: 'full' | 'instrumental'): string {
   const timestamp = Date.now();
   const random = Math.floor(Math.random() * 1000000);
-  
+
   const cleanArtist = artistSlug.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
   const cleanTrack = trackSlug.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
-  
-  return `${cleanArtist}-${cleanTrack}-${timestamp}-${random}${extension}`;
+  const suffix = kind === 'instrumental' ? '-instr' : '';
+
+  return `${cleanArtist}-${cleanTrack}${suffix}-${timestamp}-${random}${extension}`;
 }
 
 function generateAvatarFilename(artistSlug: string, extension: string): string {
@@ -151,7 +152,8 @@ export async function saveAudioFile(
   buffer: Buffer,
   originalFilename: string,
   artistSlug: string,
-  trackSlug: string
+  trackSlug: string,
+  kind: 'full' | 'instrumental' = 'full'
 ): Promise<{ audioUrl: string; filename: string; size: number; mimetype: string; fullPath: string }> {
   const timestamp = new Date().toISOString();
   console.error(`[${timestamp}] [SAVE AUDIO] Starting save process`);
@@ -167,7 +169,7 @@ export async function saveAudioFile(
     console.error(`[${timestamp}] [SAVE AUDIO] Creating artist dir: ${artistDir}`);
     await fs.mkdir(artistDir, { recursive: true });
 
-    const filename = generateSafeFilename(artistSlug, trackSlug, '.mp3');
+    const filename = generateSafeFilename(artistSlug, trackSlug, '.mp3', kind);
     const finalPath = path.join(artistDir, filename);
     console.error(`[${timestamp}] [SAVE AUDIO] Final path: ${finalPath}`);
 

@@ -219,26 +219,31 @@ export default function UploadWizardPage() {
         if (sj.success) sheetUrl = sj.url || sj.pdfUrl || sj.data?.url || '';
       }
 
-      // 4. Upload minus audio (если есть)
+      // 4. Upload minus audio (если есть) — с kind=instrumental
       let minusUrl = '';
       if (minusAudioFile) {
         const fd = new FormData();
         fd.append('file', minusAudioFile);
         fd.append('artistSlug', artistSlug);
-        fd.append('trackSlug', `${trackSlug}-minus`);
+        fd.append('trackSlug', trackSlug);
+        fd.append('kind', 'instrumental');
         const mr = await fetch('/api/upload/audio', {
           method: 'POST',
           body: fd,
         });
         const mj = await mr.json();
-        if (mj.success) minusUrl = mj.url || mj.data?.url || '';
+        if (mj.success) minusUrl = mj.url || mj.audioUrl || mj.data?.audioUrl || mj.data?.url || '';
       }
 
       // 5. Создаём Track
+      // audioType: FULL — только основной файл; INSTRUMENTAL — только минусовка; BOTH — оба файла
+      const audioType: 'FULL' | 'INSTRUMENTAL' | 'BOTH' =
+        !!audioUrl && !!minusUrl ? 'BOTH' : minusUrl && !audioUrl ? 'INSTRUMENTAL' : 'FULL';
+
       const trackPayload: any = {
         title: title.trim(),
         duration: duration || 180,
-        audioUrl,
+        audioUrl: audioUrl || minusUrl,
         cover: coverUrl || undefined,
         lyrics: lyrics.trim() || undefined,
         releaseDate: new Date().toISOString(),
@@ -247,6 +252,9 @@ export default function UploadWizardPage() {
         price: selectedLicenses.PERSONAL?.selected
           ? selectedLicenses.PERSONAL.price
           : undefined,
+        audioType,
+        instrumentalUrl: minusUrl || undefined,
+        instrumentalPrice: minusUrl ? minusPrice : undefined,
       };
       const tr = await fetch('/api/tracks', {
         method: 'POST',
