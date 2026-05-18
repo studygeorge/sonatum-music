@@ -159,7 +159,12 @@ function AuthorTracksPageInner() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold truncate">{t.title}</span>
+                      {/* Клик на названии — переход на публичную страницу трека */}
+                      <Link
+                        href={`/tracks/${t.slug}`}
+                        className="font-semibold truncate hover:underline">
+                        {t.title}
+                      </Link>
                       {/* Бейдж показываем только для не-опубликованных — для published
                          это шум, и так понятно что он живёт в каталоге. */}
                       {t.status !== 'PUBLISHED' && (
@@ -206,11 +211,6 @@ function AuthorTracksPageInner() {
                         <polyline points="6 9 12 15 18 9" />
                       </svg>
                     </button>
-                    <Link
-                      href={`/tracks/${t.slug}`}
-                      className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors hidden sm:inline-block">
-                      Открыть
-                    </Link>
                   </div>
                 </div>
 
