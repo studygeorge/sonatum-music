@@ -8,12 +8,15 @@ interface Props {
   onDone: (blob: Blob) => void;
 }
 
-const CIRCLE = 280; // диаметр кружка предпросмотра
-const OUTPUT = 512; // итоговый размер квадрата (центр будет круглым после CSS)
+const CIRCLE = 320; // диаметр круглой области выбора
+const OUTPUT = 512; // итоговый размер аватарки
 
-// Простой кадрировщик: показывает картинку в круге, поддерживает drag и zoom
-// (колесом мыши, ползунком, пинчем на мобильных). По «Готово» вырезает
-// текущий видимый кружок в 512×512 PNG и отдаёт через onDone(blob).
+// Telegram-style кадрировщик:
+// - картинка занимает всё окно, поверх — затемнение с круглым «окошком»
+// - перетаскивание (мышка / палец) → перемещение
+// - колесо мыши / пинч → зум, БЕЗ ползунка
+// - угловые скобки показывают границу видимой области
+// - кнопка "Сброс" возвращает в начальное положение
 export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
   const [src, setSrc] = useState<string>('');
   const [scale, setScale] = useState(1);
@@ -26,7 +29,6 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
   const dragRef = useRef<{ x: number; y: number; ox: number; oy: number; active: boolean }>({
     x: 0, y: 0, ox: 0, oy: 0, active: false,
   });
-  // Pinch state
   const pinchRef = useRef<{ d: number; s: number; active: boolean }>({ d: 0, s: 1, active: false });
 
   useEffect(() => {
@@ -35,8 +37,6 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  // Когда картинка загружается — устанавливаем стартовый scale так, чтобы
-  // короткая сторона помещалась в круг.
   const onImgLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
     setNatural({ w: img.naturalWidth, h: img.naturalHeight });
@@ -46,9 +46,15 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
     setOffset({ x: 0, y: 0 });
   };
 
-  // Drag handlers
+  const minScale = () => {
+    if (!natural.w || !natural.h) return 0.1;
+    const minSide = Math.min(natural.w, natural.h);
+    return CIRCLE / minSide;
+  };
+
+  // PC drag
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.isPrimary === false && pinchRef.current.active) return;
+    if (pinchRef.current.active) return;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     dragRef.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y, active: true };
   };
@@ -67,16 +73,11 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const delta = -e.deltaY * 0.0015;
-    setScale((s) => clamp(s * (1 + delta), minScale(), 8));
+    setScale((s) => clamp(s * (1 + delta), minScale(), minScale() * 10));
   };
 
   // Pinch zoom (mobile)
-  const touchesRef = useRef<{ [k: number]: { x: number; y: number } }>({});
   const onTouchStart = (e: React.TouchEvent) => {
-    for (let i = 0; i < e.touches.length; i++) {
-      const t = e.touches[i];
-      touchesRef.current[t.identifier] = { x: t.clientX, y: t.clientY };
-    }
     if (e.touches.length === 2) {
       const [a, b] = [e.touches[0], e.touches[1]];
       const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
@@ -90,20 +91,11 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
       const [a, b] = [e.touches[0], e.touches[1]];
       const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
       const ns = pinchRef.current.s * (d / pinchRef.current.d);
-      setScale(clamp(ns, minScale(), 8));
+      setScale(clamp(ns, minScale(), minScale() * 10));
     }
   };
   const onTouchEnd = (e: React.TouchEvent) => {
     if (e.touches.length < 2) pinchRef.current.active = false;
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      delete touchesRef.current[e.changedTouches[i].identifier];
-    }
-  };
-
-  const minScale = () => {
-    if (!natural.w || !natural.h) return 0.1;
-    const minSide = Math.min(natural.w, natural.h);
-    return CIRCLE / minSide;
   };
 
   const reset = () => {
@@ -111,7 +103,7 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
     setOffset({ x: 0, y: 0 });
   };
 
-  // Финальная отрисовка: вырезаем 512×512 квадрат с тем же преобразованием
+  // Финальная отрисовка: квадрат 512×512, обрезанный кругом
   const confirm = async () => {
     if (!imgRef.current) return;
     setBusy(true);
@@ -122,30 +114,18 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Маска по кругу (canvas сам по себе квадратный, но мы рисуем
-      // изображение, а CSS на фронте обрезает в круг). Чтобы получить
-      // фактически круглую png — вырезаем clip.
       ctx.beginPath();
       ctx.arc(OUTPUT / 2, OUTPUT / 2, OUTPUT / 2, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
 
-      // Масштаб: на экране 1 px источника = scale экранных px.
-      // В выходной 512×512 1 px CIRCLE = OUTPUT/CIRCLE = ~1.83.
       const k = OUTPUT / CIRCLE;
-      const sw = natural.w;
-      const sh = natural.h;
-
-      const drawW = sw * scale * k;
-      const drawH = sh * scale * k;
-      const drawX = (OUTPUT / 2) - (sw * scale / 2 - offset.x) * k - (sw * scale * k - sw * scale * k) / 2;
-      // Положение: центр круга в (OUTPUT/2, OUTPUT/2), центр картинки
-      // относительно центра круга — offset (в экранных px). Перевод в канвас:
+      const drawW = natural.w * scale * k;
+      const drawH = natural.h * scale * k;
       const cx = OUTPUT / 2 + offset.x * k;
       const cy = OUTPUT / 2 + offset.y * k;
       const dx = cx - drawW / 2;
       const dy = cy - drawH / 2;
-
       ctx.drawImage(imgRef.current, dx, dy, drawW, drawH);
 
       canvas.toBlob((blob) => {
@@ -156,90 +136,127 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
     }
   };
 
+  // Размер контейнера — больше круга, чтобы оставить место для скобок и затемнения
+  const CONTAINER = CIRCLE + 80;
+
+  // Картинка на экране
+  const imgW = natural.w * scale;
+  const imgH = natural.h * scale;
+
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-md p-5 shadow-2xl">
-        <h3 className="text-lg font-bold text-gray-900 mb-1">Подгоните фото</h3>
-        <p className="text-xs text-gray-500 mb-4">
-          Перетаскивайте — позиция; колесом мыши, ползунком или пинчем — масштаб.
-        </p>
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/85">
+      {/* Header — закрыть */}
+      <button
+        type="button"
+        onClick={onCancel}
+        className="absolute top-4 left-4 text-white/80 hover:text-white text-3xl leading-none w-10 h-10 flex items-center justify-center">
+        ×
+      </button>
+      {/* Готово */}
+      <button
+        type="button"
+        onClick={confirm}
+        disabled={busy || !natural.w}
+        className="absolute top-4 right-4 text-white font-semibold text-sm px-5 py-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50">
+        {busy ? 'Сохраняем…' : 'Готово'}
+      </button>
 
-        {/* Контейнер с круглой маской */}
-        <div
-          className="mx-auto select-none touch-none"
-          style={{ width: CIRCLE, height: CIRCLE }}>
-          <div
-            className="relative overflow-hidden rounded-full bg-gray-100 border-2 border-gray-200 cursor-grab active:cursor-grabbing"
-            style={{ width: CIRCLE, height: CIRCLE }}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-            onWheel={onWheel}
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}>
-            {src && (
-              <img
-                ref={imgRef}
-                src={src}
-                alt=""
-                onLoad={onImgLoad}
-                draggable={false}
-                style={{
-                  position: 'absolute',
-                  left: '50%',
-                  top: '50%',
-                  width: natural.w * scale,
-                  height: natural.h * scale,
-                  transform: `translate(${offset.x - natural.w * scale / 2}px, ${offset.y - natural.h * scale / 2}px)`,
-                  userSelect: 'none',
-                  pointerEvents: 'none',
-                  maxWidth: 'none',
-                }}
-              />
-            )}
-            {/* Сетка третей чтоб было удобно */}
-            <div className="absolute inset-0 pointer-events-none border-2 border-white/50 rounded-full" />
-          </div>
-        </div>
-
-        {/* Zoom slider */}
-        <div className="mt-4 flex items-center gap-3">
-          <span className="text-xs text-gray-500 shrink-0">Масштаб</span>
-          <input
-            type="range"
-            min={minScale()}
-            max={Math.max(minScale() * 5, 5)}
-            step="0.01"
-            value={scale}
-            onChange={(e) => setScale(parseFloat(e.target.value))}
-            className="flex-1 accent-black"
+      {/* Сам кадрировщик */}
+      <div
+        className="relative overflow-hidden select-none touch-none"
+        style={{ width: CONTAINER, height: CONTAINER, maxWidth: '100vw', maxHeight: '100vh' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onWheel={onWheel}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}>
+        {/* Картинка */}
+        {src && (
+          <img
+            ref={imgRef}
+            src={src}
+            alt=""
+            onLoad={onImgLoad}
+            draggable={false}
+            style={{
+              position: 'absolute',
+              left: CONTAINER / 2 - imgW / 2 + offset.x,
+              top: CONTAINER / 2 - imgH / 2 + offset.y,
+              width: imgW,
+              height: imgH,
+              userSelect: 'none',
+              pointerEvents: 'none',
+              maxWidth: 'none',
+              cursor: 'grab',
+            }}
           />
-          <button
-            type="button"
-            onClick={reset}
-            className="text-xs text-gray-700 underline hover:text-black shrink-0">
-            сброс
-          </button>
-        </div>
+        )}
 
-        <div className="flex gap-2 mt-5">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="flex-1 px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900 font-medium hover:bg-gray-100 transition-colors">
-            Отмена
-          </button>
-          <button
-            type="button"
-            onClick={confirm}
-            disabled={busy || !natural.w}
-            className="flex-1 px-4 py-3 rounded-xl bg-black text-white font-medium hover:bg-gray-800 transition-colors disabled:opacity-50">
-            {busy ? 'Сохраняем…' : 'Готово'}
-          </button>
-        </div>
+        {/* Затемнение с круглым окном (box-shadow trick) */}
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            left: CONTAINER / 2 - CIRCLE / 2,
+            top: CONTAINER / 2 - CIRCLE / 2,
+            width: CIRCLE,
+            height: CIRCLE,
+            boxShadow: '0 0 0 9999px rgba(0,0,0,0.65)',
+            border: '1px solid rgba(255,255,255,0.15)',
+          }}
+        />
+
+        {/* Угловые скобки вокруг круга */}
+        <CropBracket pos="tl" />
+        <CropBracket pos="tr" />
+        <CropBracket pos="bl" />
+        <CropBracket pos="br" />
       </div>
+
+      {/* Сброс */}
+      <button
+        type="button"
+        onClick={reset}
+        className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/70 hover:text-white text-sm uppercase tracking-widest">
+        Сброс
+      </button>
+    </div>
+  );
+}
+
+function CropBracket({ pos }: { pos: 'tl' | 'tr' | 'bl' | 'br' }) {
+  // Скобка: 2 белые линии в углу 24x24, угол к центру круга
+  const CONTAINER = CIRCLE + 80;
+  const inset = CONTAINER / 2 - CIRCLE / 2; // отступ от края контейнера до круга
+  const size = 22;
+  const off = inset - 6;
+  const isTop = pos.startsWith('t');
+  const isLeft = pos.endsWith('l');
+  const pad: any = {};
+  if (isTop) pad.top = off; else pad.bottom = off;
+  if (isLeft) pad.left = off; else pad.right = off;
+  return (
+    <div className="absolute pointer-events-none" style={{ ...pad, width: size, height: size }}>
+      <div
+        className="absolute bg-white"
+        style={{
+          width: 2,
+          height: size,
+          ...(isLeft ? { left: 0 } : { right: 0 }),
+          ...(isTop ? { top: 0 } : { bottom: 0 }),
+        }}
+      />
+      <div
+        className="absolute bg-white"
+        style={{
+          height: 2,
+          width: size,
+          ...(isLeft ? { left: 0 } : { right: 0 }),
+          ...(isTop ? { top: 0 } : { bottom: 0 }),
+        }}
+      />
     </div>
   );
 }
