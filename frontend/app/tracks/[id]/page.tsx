@@ -325,11 +325,10 @@ export default function TrackPage({ params }: { params: { id: string } }) {
              <h2 className="text-[28px] font-black tracking-tight mb-6 text-[#1c1c1e]">Похожие треки в этом жанре</h2>
              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {similarTracks.map((sim: any) => (
-                  <div
+                  <Link
                     key={sim.id}
-                    className="cursor-pointer"
-                    onClick={() => playTrack(sim)}
-                  >
+                    href={`/tracks/${sim.slug || sim.id}`}
+                    className="cursor-pointer block group">
                     <div className="aspect-square rounded-[1.25rem] bg-gray-200 mb-3 overflow-hidden shadow-sm border border-[var(--border)] relative">
                       {sim.cover && (
                         <img
@@ -339,12 +338,14 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                         />
                       )}
                     </div>
-                    <h4 className="font-bold text-[#1c1c1e] text-sm truncate leading-tight">{sim.title}</h4>
+                    <h4 className="font-bold text-[#1c1c1e] text-sm truncate leading-tight group-hover:underline">{sim.title}</h4>
                     <p className="text-[13px] text-[var(--text-secondary)] truncate leading-tight mt-0.5">
                       {sim.artist?.name || 'Неизвестный'}
                     </p>
-                    <p className="text-[12px] text-gray-400 mt-0.5 tabular-nums">{formatTime(sim.duration)}</p>
-                  </div>
+                    {sim.duration > 0 && (
+                      <p className="text-[12px] text-gray-400 mt-0.5 tabular-nums">{formatTime(sim.duration)}</p>
+                    )}
+                  </Link>
                 ))}
              </div>
           </div>
@@ -450,19 +451,30 @@ export default function TrackPage({ params }: { params: { id: string } }) {
             
             <h3 className="text-2xl font-black mt-10 mb-6 tracking-tight text-[#1c1c1e]">Похожие треки</h3>
             <div className="flex flex-col">
-               {similarTracks.length > 0 ? similarTracks.map((sim, i) => (
-                 <div key={sim.id} className="flex items-center py-2.5 cursor-pointer border-b border-black/5 last:border-0 rounded-lg px-2 -mx-2" onClick={() => playTrack(sim)}>
+               {similarTracks.length > 0 ? similarTracks.map((sim) => (
+                 <Link
+                   key={sim.id}
+                   href={`/tracks/${sim.slug || sim.id}`}
+                   className="flex items-center py-2.5 cursor-pointer border-b border-black/5 last:border-0 rounded-lg px-2 -mx-2 hover:bg-black/5 transition-colors">
                     <div className="w-10 h-10 rounded-md bg-gray-200 overflow-hidden shrink-0 mr-3">
-                       <img src={sim.cover} className="w-full h-full object-cover" alt="sim" />
+                       {sim.cover ? (
+                         <img src={sim.cover} className="w-full h-full object-cover" alt="sim" />
+                       ) : (
+                         <div className="w-full h-full flex items-center justify-center text-xs font-bold text-gray-400">
+                           {(sim.title || '?').trim()[0]?.toUpperCase()}
+                         </div>
+                       )}
                     </div>
                     <div className="flex-1 min-w-0 pr-4">
                        <div className="font-bold text-[14px] text-[#1c1c1e] truncate">{sim.title}</div>
                        <div className="text-[12px] text-[var(--text-secondary)] truncate mt-0.5">{sim.artist?.name || 'Неизвестный'}</div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                       <span className="text-[13px] font-medium text-[var(--text-secondary)] tabular-nums">{formatTime(sim.duration)}</span>
-                    </div>
-                 </div>
+                    {sim.duration > 0 && (
+                      <div className="flex items-center gap-3 shrink-0">
+                         <span className="text-[13px] font-medium text-[var(--text-secondary)] tabular-nums">{formatTime(sim.duration)}</span>
+                      </div>
+                    )}
+                 </Link>
                )) : (
                  <div className="text-sm text-[var(--text-secondary)]">Нет похожих треков</div>
                )}
