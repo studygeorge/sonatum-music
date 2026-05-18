@@ -22,21 +22,31 @@ export default function TrackPage({ params }: { params: { id: string } }) {
   const [isPremium, setIsPremium] = useState(false);
   const [lyricsExpanded, setLyricsExpanded] = useState(false);
 
-  // Состояние "добавлен в библиотеку" (бывшая «лайк»-логика, теперь UI '+')
+  // Состояние "добавлен в библиотеку" (та же логика что у сердечка в плеере)
   const [inLibrary, setInLibrary] = useState(false);
   const [libraryBusy, setLibraryBusy] = useState(false);
 
+  // Тот же подход, что в Player.tsx — fetch с ключом sonatum_token.
   const toggleLibrary = async () => {
-    if (libraryBusy) return;
+    if (libraryBusy || !track?.id) return;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('sonatum_token') : null;
+    if (!token) {
+      router.push('/login');
+      return;
+    }
     setLibraryBusy(true);
+    const wasInLibrary = inLibrary;
+    setInLibrary(!wasInLibrary); // optimistic
     try {
-      if (inLibrary) {
-        const res = await api.unlikeTrack(params.id);
-        if (res.success) setInLibrary(false);
-      } else {
-        const res = await api.likeTrack(params.id);
-        if (res.success) setInLibrary(true);
+      const res = await fetch(`/api/likes/${track.id}`, {
+        method: wasInLibrary ? 'DELETE' : 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        setInLibrary(wasInLibrary); // rollback
       }
+    } catch {
+      setInLibrary(wasInLibrary);
     } finally {
       setLibraryBusy(false);
     }
@@ -70,9 +80,9 @@ export default function TrackPage({ params }: { params: { id: string } }) {
           if (trackRes.data.similarTracks) {
             setSimilarTracks(trackRes.data.similarTracks.slice(0, 4));
           }
-          // Проверяем, в библиотеке ли уже трек (бывший liked)
+          // Проверяем, в библиотеке ли уже трек — ключ sonatum_token (как в Player.tsx)
           try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('sonatum_token');
             if (token) {
               const r = await fetch(`/api/likes/${trackRes.data.track.id}`, {
                 headers: { Authorization: `Bearer ${token}` },
