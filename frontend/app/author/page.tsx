@@ -7,18 +7,65 @@ import { authStorage } from '@/app/lib/auth';
 export default function AuthorOverviewPage() {
   const [me, setMe] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/author/me', {
+  const reload = () => {
+    return fetch('/api/author/me', {
       headers: { Authorization: `Bearer ${authStorage.getToken() || ''}` },
     })
       .then((r) => r.json())
       .then((j) => {
         if (j.success) setMe(j.data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      });
+  };
+
+  useEffect(() => {
+    reload().finally(() => setLoading(false));
   }, []);
+
+  const uploadAvatar = async (file: File | null) => {
+    if (!file || !me?.artist) return;
+    setAvatarUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('artistSlug', me.artist.slug || me.artist.id || 'artist');
+      const ur = await fetch('/api/upload/avatar', { method: 'POST', body: fd });
+      const uj = await ur.json();
+      const avatarUrl = uj?.data?.avatarUrl || uj?.avatarUrl || uj?.url;
+      if (!uj.success || !avatarUrl) return;
+      // Записываем в Artist.avatar через свой эндпоинт
+      await fetch('/api/author/me', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authStorage.getToken() || ''}`,
+        },
+        body: JSON.stringify({ avatar: avatarUrl }),
+      });
+      await reload();
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const removeAvatar = async () => {
+    if (!me?.artist) return;
+    setAvatarUploading(true);
+    try {
+      await fetch('/api/author/me', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authStorage.getToken() || ''}`,
+        },
+        body: JSON.stringify({ avatar: '' }),
+      });
+      await reload();
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   if (loading) return null;
   if (!me) return null;
@@ -28,20 +75,24 @@ export default function AuthorOverviewPage() {
 
   return (
     <div className="space-y-6 animate-fadeInUp">
-      <section
-        className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white"
-        style={{
-          background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)',
-        }}>
+      <section className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white bg-gray-900 flex items-center gap-5">
+        {/* Аватар в шапке */}
+        <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white/10 border border-white/20 overflow-hidden shrink-0 flex items-center justify-center text-3xl font-bold text-white/70">
+          {me.artist?.avatar ? (
+            <img src={me.artist.avatar} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span>{(displayName || '?').trim()[0]?.toUpperCase() || '?'}</span>
+          )}
+        </div>
         <div className="relative z-10 max-w-2xl">
-          <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-90">
+          <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-80">
             Кабинет автора
           </div>
           <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white">
             {displayName}
           </h1>
           {bio && (
-            <p className="text-sm md:text-base text-white/85 max-w-xl mt-3 line-clamp-2">
+            <p className="text-sm md:text-base text-white/75 max-w-xl mt-3 line-clamp-2">
               {bio}
             </p>
           )}
@@ -57,13 +108,13 @@ export default function AuthorOverviewPage() {
           <h2 className="text-xl font-bold tracking-tight">Быстрые действия</h2>
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
-          <Link href="/author/upload" className="apple-card p-5 hover:scale-[1.01] transition-transform">
+          <Link href="/author/upload" className="apple-card p-5 hover:bg-[var(--hover)] transition-colors">
                         <div className="font-semibold mb-1">Загрузить новый трек</div>
             <div className="text-sm text-[var(--text-secondary)]">
               Оригинал, кавер или только ноты — выбираете тип и заполняете 3 шага.
             </div>
           </Link>
-          <Link href="/author/finance" className="apple-card p-5 hover:scale-[1.01] transition-transform">
+          <Link href="/author/finance" className="apple-card p-5 hover:bg-[var(--hover)] transition-colors">
                         <div className="font-semibold mb-1">
               {me.user.payoutEnabled ? 'Управление выплатами' : 'Подключить выплаты'}
             </div>
@@ -73,13 +124,13 @@ export default function AuthorOverviewPage() {
                 : 'Подтвердите статус самозанятого и подключите СБП.'}
             </div>
           </Link>
-          <Link href="/author/collabs" className="apple-card p-5 hover:scale-[1.01] transition-transform">
+          <Link href="/author/collabs" className="apple-card p-5 hover:bg-[var(--hover)] transition-colors">
                         <div className="font-semibold mb-1">Найти соавтора</div>
             <div className="text-sm text-[var(--text-secondary)]">
               Творческая лаборатория — заявки на сотрудничество с другими авторами.
             </div>
           </Link>
-          <Link href="/author/events" className="apple-card p-5 hover:scale-[1.01] transition-transform">
+          <Link href="/author/events" className="apple-card p-5 hover:bg-[var(--hover)] transition-colors">
                         <div className="font-semibold mb-1">Создать событие</div>
             <div className="text-sm text-[var(--text-secondary)]">
               Концерт, премьера, мастер-класс — попадёт в афишу после модерации.
@@ -88,8 +139,55 @@ export default function AuthorOverviewPage() {
         </div>
       </section>
       {me.artist && (
-        <section className="apple-card p-6">
-          <h2 className="text-xl font-bold tracking-tight mb-4">Профиль</h2>
+        <section className="apple-card p-6 space-y-5">
+          <h2 className="text-xl font-bold tracking-tight">Профиль</h2>
+
+          {/* Фото профиля */}
+          <div className="flex items-center gap-5 pb-5 border-b border-[var(--border)]">
+            <div className="w-24 h-24 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center text-2xl font-bold text-gray-400">
+              {me.artist.avatar ? (
+                <img src={me.artist.avatar} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span>{(me.artist.name || '?').trim()[0]?.toUpperCase() || '?'}</span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-gray-900 mb-0.5">Фото профиля</div>
+              <p className="text-xs text-gray-600 mb-3">
+                JPG, PNG или WebP до 5 МБ. Показывается на странице артиста и в каталоге.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <label
+                  className={`px-4 py-2 rounded-full text-sm font-medium cursor-pointer transition-colors ${
+                    avatarUploading
+                      ? 'bg-gray-200 text-gray-500'
+                      : 'bg-black text-white hover:bg-gray-800'
+                  }`}>
+                  {avatarUploading
+                    ? 'Загрузка…'
+                    : me.artist.avatar
+                    ? 'Заменить фото'
+                    : 'Загрузить фото'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    className="hidden"
+                    disabled={avatarUploading}
+                    onChange={(e) => uploadAvatar(e.target.files?.[0] || null)}
+                  />
+                </label>
+                {me.artist.avatar && !avatarUploading && (
+                  <button
+                    type="button"
+                    onClick={removeAvatar}
+                    className="px-4 py-2 rounded-full text-sm font-medium bg-white text-gray-900 border border-gray-300 hover:bg-gray-100 transition-colors">
+                    Убрать
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <Info label="Сценическое имя" value={me.artist.name} />
             <Info label="Slug" value={me.artist.slug} />
@@ -100,8 +198,8 @@ export default function AuthorOverviewPage() {
           </div>
           <Link
             href={`/artist/${me.artist.slug}`}
-            className="inline-block mt-4 text-sm text-[var(--accent)] hover:underline">
-            Открыть публичный профиль 
+            className="inline-block mt-1 text-sm underline decoration-gray-400 hover:decoration-black underline-offset-2">
+            Открыть публичный профиль
           </Link>
         </section>
       )}

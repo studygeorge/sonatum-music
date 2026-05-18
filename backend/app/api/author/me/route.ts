@@ -144,3 +144,60 @@ export async function GET(request: NextRequest) {
     { headers: cors }
   );
 }
+
+
+// PATCH /api/author/me — обновление профиля артиста самим автором
+// (avatar, bio, coverImage, region, city, foundedYear, socialLinks).
+// Жёстко защищено сессией — только владелец Artist.
+export async function PATCH(request: NextRequest) {
+  const cors = getCorsHeaders(request.headers.get("origin") || undefined);
+  const auth = request.headers.get("Authorization");
+  if (!auth?.startsWith("Bearer ")) {
+    return NextResponse.json(
+      { success: false, error: "Требуется авторизация" },
+      { status: 401, headers: cors }
+    );
+  }
+  const session = await AuthService.validateSession(auth.substring(7));
+  if (!session) {
+    return NextResponse.json(
+      { success: false, error: "Сессия истекла" },
+      { status: 401, headers: cors }
+    );
+  }
+
+  const artist = await prisma.artist.findUnique({
+    where: { userId: session.userId },
+    select: { id: true },
+  });
+  if (!artist) {
+    return NextResponse.json(
+      { success: false, error: "Профиль артиста не найден" },
+      { status: 404, headers: cors }
+    );
+  }
+
+  const body = await request.json().catch(() => ({}));
+
+  const data: any = {};
+  if (typeof body.avatar === "string") data.avatar = body.avatar || null;
+  if (typeof body.coverImage === "string") data.coverImage = body.coverImage || null;
+  if (typeof body.bio === "string") data.bio = body.bio || null;
+  if (typeof body.region === "string") data.region = body.region || null;
+  if (typeof body.city === "string") data.city = body.city || null;
+  if (body.foundedYear !== undefined) data.foundedYear = body.foundedYear ? Number(body.foundedYear) : null;
+  if (body.socialLinks !== undefined) data.socialLinks = body.socialLinks || null;
+
+  const updated = await prisma.artist.update({
+    where: { id: artist.id },
+    data,
+    select: {
+      id: true, name: true, slug: true, avatar: true, coverImage: true,
+      bio: true, region: true, city: true, foundedYear: true, socialLinks: true,
+      verified: true, followers: true,
+    },
+  });
+
+  return NextResponse.json({ success: true, data: updated }, { headers: cors });
+}
+
