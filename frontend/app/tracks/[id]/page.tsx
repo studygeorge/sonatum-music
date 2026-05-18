@@ -140,18 +140,10 @@ export default function TrackPage({ params }: { params: { id: string } }) {
       {/* Левая колонка */}
       <div className="flex-1 xl:max-w-[850px]">
         {/* Мобильная версия: обложка слева, текст справа. Десктоп: обложка слева большая, текст справа/снизу */}
-        <div className="flex flex-row md:flex-row gap-4 md:gap-6 items-center md:items-start mb-6 md:mb-0">
-           {/* Обложка (112px на мобильных, 320px на десктопе) */}
-           <div className="w-28 h-28 md:w-[320px] md:h-[320px] rounded-[1rem] md:rounded-[2rem] bg-gray-200 shadow-md md:shadow-xl border border-[var(--border)] shrink-0 overflow-hidden relative group">
+        <div className="flex flex-row md:flex-row gap-4 md:gap-6 items-center md:items-start mb-6 md:mb-8">
+           {/* Обложка (112px на мобильных, 320px на десктопе) — без hover-эффектов */}
+           <div className="w-28 h-28 md:w-[320px] md:h-[320px] rounded-[1rem] md:rounded-[2rem] bg-gray-200 shadow-md md:shadow-xl border border-[var(--border)] shrink-0 overflow-hidden relative">
               {track.cover && <img src={track.cover} className="w-full h-full object-cover" alt="cover" />}
-              <div 
-                 className="hidden md:flex absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex-col items-center justify-center cursor-pointer" 
-                 onClick={() => playTrack(track as any)}
-              >
-                 <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
-                    <span className="text-[var(--text-primary)] font-bold text-2xl md:text-3xl ml-1 md:ml-2">▶</span>
-                 </div>
-              </div>
            </div>
            
            {/* Текстовая информация */}
@@ -290,7 +282,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                 {similarTracks.map((sim: any) => (
                   <div
                     key={sim.id}
-                    className="group cursor-pointer"
+                    className="cursor-pointer"
                     onClick={() => playTrack(sim)}
                   >
                     <div className="aspect-square rounded-[1.25rem] bg-gray-200 mb-3 overflow-hidden shadow-sm border border-[var(--border)] relative">
@@ -298,14 +290,11 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                         <img
                           src={sim.cover}
                           alt={sim.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          className="w-full h-full object-cover"
                         />
                       )}
-                      <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="text-white font-bold bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-md text-xs">▶ Слушать</span>
-                      </div>
                     </div>
-                    <h4 className="font-bold text-[#1c1c1e] text-sm truncate leading-tight group-hover:underline">{sim.title}</h4>
+                    <h4 className="font-bold text-[#1c1c1e] text-sm truncate leading-tight">{sim.title}</h4>
                     <p className="text-[13px] text-[var(--text-secondary)] truncate leading-tight mt-0.5">
                       {sim.artist?.name || 'Неизвестный'}
                     </p>
@@ -372,7 +361,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                <div className="flex flex-col justify-center">
                   <div className="font-bold text-[17px] text-[#1c1c1e] flex items-center gap-1 group cursor-pointer hover:underline">
                     {track.title} 
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="group-hover:translate-x-0.5 transition-transform"><path d="M9 18l6-6-6-6"/></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
                   </div>
                   <div className="text-[var(--text-secondary)] text-[14px] mt-0.5">1 трек</div>
                </div>
@@ -399,21 +388,15 @@ export default function TrackPage({ params }: { params: { id: string } }) {
             <h3 className="text-2xl font-black mt-10 mb-6 tracking-tight text-[#1c1c1e]">Похожие треки</h3>
             <div className="flex flex-col">
                {similarTracks.length > 0 ? similarTracks.map((sim, i) => (
-                 <div key={sim.id} className="flex items-center py-2.5 group cursor-pointer border-b border-black/5 last:border-0 hover:bg-black/5 rounded-lg px-2 -mx-2 transition-colors" onClick={() => playTrack(sim)}>
-                    <div className="w-10 h-10 rounded-md bg-gray-200 overflow-hidden shrink-0 relative mr-3">
+                 <div key={sim.id} className="flex items-center py-2.5 cursor-pointer border-b border-black/5 last:border-0 rounded-lg px-2 -mx-2" onClick={() => playTrack(sim)}>
+                    <div className="w-10 h-10 rounded-md bg-gray-200 overflow-hidden shrink-0 mr-3">
                        <img src={sim.cover} className="w-full h-full object-cover" alt="sim" />
-                       <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                         <span className="text-white text-xs font-bold">▶</span>
-                       </div>
                     </div>
                     <div className="flex-1 min-w-0 pr-4">
                        <div className="font-bold text-[14px] text-[#1c1c1e] truncate">{sim.title}</div>
                        <div className="text-[12px] text-[var(--text-secondary)] truncate mt-0.5">{sim.artist?.name || 'Неизвестный'}</div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                       <button className="text-gray-400 hover:text-black transition-colors opacity-0 group-hover:opacity-100 p-1">
-                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                       </button>
                        <span className="text-[13px] font-medium text-[var(--text-secondary)] tabular-nums">{formatTime(sim.duration)}</span>
                     </div>
                  </div>
