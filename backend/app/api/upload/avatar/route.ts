@@ -22,16 +22,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const artistSlug = fields.artistSlug;
+    // Принимаем artistSlug, userSlug или slug — единый эндпоинт и для авторов и для слушателей
+    const artistSlug = fields.artistSlug || fields.userSlug || fields.slug;
     if (!artistSlug) {
-      console.error(`[${timestamp}] [UPLOAD AVATAR] ❌ No artistSlug provided`);
+      console.error(`[${timestamp}] [UPLOAD AVATAR] ❌ No slug provided`);
       return NextResponse.json(
-        { success: false, error: 'Artist slug is required' },
+        { success: false, error: 'Slug is required (artistSlug or userSlug)' },
         { status: 400 }
       );
     }
 
-    console.error(`[${timestamp}] [UPLOAD AVATAR] Artist slug: ${artistSlug}`);
+    console.error(`[${timestamp}] [UPLOAD AVATAR] Slug: ${artistSlug}`);
 
     const validation = validateImageFile(file);
     if (!validation.valid) {
@@ -50,8 +51,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      avatarUrl: result.avatarUrl,
+      url: result.avatarUrl,
       data: {
         avatarUrl: result.avatarUrl,
+        url: result.avatarUrl,
         filename: result.filename,
         size: result.size
       },

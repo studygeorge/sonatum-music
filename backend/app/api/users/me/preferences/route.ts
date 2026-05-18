@@ -16,16 +16,19 @@ async function putHandler(request: NextRequest, user: AuthUser) {
 
   try {
     const body = await request.json();
-    const { favoriteGenres, favoriteEras, favoriteComposers, nickname, bio } = body;
+    const { favoriteGenres, favoriteEras, favoriteComposers, nickname, bio, avatar, firstName, lastName } = body;
 
     const updatedUser = await prisma.user.update({
       where: { id: user.id.toString() },
-      data: { 
+      data: {
         favoriteGenres: favoriteGenres !== undefined ? favoriteGenres : undefined,
         favoriteEras: favoriteEras !== undefined ? favoriteEras : undefined,
         favoriteComposers: favoriteComposers !== undefined ? favoriteComposers : undefined,
         nickname: nickname !== undefined ? nickname : undefined,
-        bio: bio !== undefined ? bio : undefined
+        bio: bio !== undefined ? bio : undefined,
+        avatar: avatar !== undefined ? (avatar || null) : undefined,
+        firstName: firstName !== undefined ? (firstName || null) : undefined,
+        lastName: lastName !== undefined ? (lastName || null) : undefined,
       },
       select: {
         id: true,
@@ -33,7 +36,10 @@ async function putHandler(request: NextRequest, user: AuthUser) {
         favoriteEras: true,
         favoriteComposers: true,
         nickname: true,
-        bio: true
+        bio: true,
+        avatar: true,
+        firstName: true,
+        lastName: true,
       }
     });
 

@@ -83,9 +83,89 @@ export default function ProfilePage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    // TODO: PATCH /api/users/me with updated name
-    await new Promise(r => setTimeout(r, 800));
-    setSaving(false);
+    try {
+      const token = authStorage.getToken();
+      // Парсим nameValue → firstName + lastName (если есть пробел)
+      const parts = (nameValue || '').trim().split(/\s+/);
+      const firstName = parts[0] || null;
+      const lastName = parts.slice(1).join(' ') || null;
+      const r = await fetch('/api/users/me/preferences', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ firstName, lastName }),
+      });
+      const j = await r.json();
+      if (j.success && j.data) {
+        const updated = { ...user, ...j.data };
+        setUser(updated);
+        authStorage.setUser(updated);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Загрузка аватара через /api/upload/avatar + сохранение URL в /api/users/me/preferences
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const handleAvatarUpload = async (file: File | null) => {
+    if (!file || !user) return;
+    setAvatarUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('userSlug', user.username || user.id || 'user');
+      const ur = await fetch('/api/upload/avatar', { method: 'POST', body: fd });
+      const uj = await ur.json();
+      const avatarUrl = uj?.data?.avatarUrl || uj?.avatarUrl || uj?.url;
+      if (!uj.success || !avatarUrl) {
+        console.error('Avatar upload failed', uj);
+        return;
+      }
+      // Сохраняем в профиль
+      const token = authStorage.getToken();
+      const r = await fetch('/api/users/me/preferences', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ avatar: avatarUrl }),
+      });
+      const j = await r.json();
+      if (j.success) {
+        const updated = { ...user, avatar: avatarUrl };
+        setUser(updated);
+        authStorage.setUser(updated);
+      }
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+  const handleAvatarRemove = async () => {
+    if (!user) return;
+    setAvatarUploading(true);
+    try {
+      const token = authStorage.getToken();
+      const r = await fetch('/api/users/me/preferences', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ avatar: '' }),
+      });
+      const j = await r.json();
+      if (j.success) {
+        const updated = { ...user, avatar: null };
+        setUser(updated);
+        authStorage.setUser(updated);
+      }
+    } finally {
+      setAvatarUploading(false);
+    }
   };
 
   const handleSubscribe = async (tier: 'PREMIUM') => {
@@ -184,6 +264,50 @@ export default function ProfilePage() {
   // ─── Tab renderers ───────────────────────────────────────────────────────────
   const renderSettings = () => (
     <div className="space-y-8 animate-fadeInUp">
+      {/* Аватар */}
+      <div className="apple-card p-6 md:p-8">
+        <h2 className="text-2xl font-bold mb-6">Фото профиля</h2>
+        <div className="flex items-center gap-5">
+          <div className="w-24 h-24 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-2xl font-bold text-gray-400 overflow-hidden shrink-0">
+            {user.avatar ? (
+              <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span>{(user.firstName?.[0] || user.username?.[0] || user.email?.[0] || '?').toUpperCase()}</span>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-gray-600 mb-2">
+              JPG или PNG, до 5 МБ. Будет показано рядом с вашим именем в комментариях и плейлистах.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <label
+                className={`px-4 py-2 rounded-full text-sm font-medium cursor-pointer transition-colors ${
+                  avatarUploading
+                    ? 'bg-gray-200 text-gray-500'
+                    : 'bg-black text-white hover:bg-gray-800'
+                }`}>
+                {avatarUploading ? 'Загрузка…' : user.avatar ? 'Заменить фото' : 'Загрузить фото'}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  className="hidden"
+                  disabled={avatarUploading}
+                  onChange={(e) => handleAvatarUpload(e.target.files?.[0] || null)}
+                />
+              </label>
+              {user.avatar && !avatarUploading && (
+                <button
+                  type="button"
+                  onClick={handleAvatarRemove}
+                  className="px-4 py-2 rounded-full text-sm font-medium bg-white text-gray-900 border border-gray-300 hover:bg-gray-100 transition-colors">
+                  Убрать
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="apple-card p-6 md:p-8">
         <h2 className="text-2xl font-bold mb-6">Профиль</h2>
         <form className="space-y-4 max-w-md" onSubmit={handleSave}>
@@ -221,11 +345,11 @@ export default function ProfilePage() {
       </div>
       {/* Монетизация — только для артистов */}
       {user.role === 'ARTIST' && user.balance !== undefined && (
-        <div className="apple-card p-6 md:p-8 border border-green-500/20 bg-green-50/50">
-          <h2 className="text-2xl font-bold mb-2 text-green-700">Баланс</h2>
+        <div className="apple-card p-6 md:p-8 border border-gray-300 bg-gray-50">
+          <h2 className="text-2xl font-bold mb-2 text-gray-900">Баланс</h2>
           <p className="text-[var(--text-secondary)] mb-4 text-sm">Начисления за продажи ваших треков и нот.</p>
-          <div className="text-4xl font-black text-green-600 mb-6">{Number(user.balance).toFixed(2)} ₽</div>
-          <button className="apple-button bg-green-600 hover:bg-green-700 text-white border-transparent disabled:opacity-50" disabled={Number(user.balance) < 1000}>
+          <div className="text-4xl font-black text-gray-900 mb-6">{Number(user.balance).toFixed(2)} ₽</div>
+          <button className="apple-button bg-black hover:bg-gray-800 text-white border-transparent disabled:opacity-50" disabled={Number(user.balance) < 1000}>
             Вывести средства (от 1000 ₽)
           </button>
         </div>
