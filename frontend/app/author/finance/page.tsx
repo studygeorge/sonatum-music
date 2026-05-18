@@ -5,6 +5,16 @@ import Link from 'next/link';
 import { authStorage } from '@/app/lib/auth';
 import PayoutSetupModal from '@/app/components/PayoutSetupModal';
 
+// Простой inline-баннер вместо alert
+function showBanner(msg: string) {
+  if (typeof document === 'undefined') return;
+  const el = document.createElement('div');
+  el.textContent = msg;
+  el.style.cssText = 'position:fixed;right:1rem;bottom:1rem;z-index:9999;padding:.75rem 1rem;border-radius:.75rem;background:#000;color:#fff;font-size:.875rem;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.15);max-width:24rem;word-break:break-word;';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
 type Fin = {
   balance: number;
   availableForWithdrawal: number;
@@ -42,12 +52,12 @@ type Fin = {
 };
 
 const STATUS_LABEL: Record<string, { l: string; c: string }> = {
-  PAID: { l: 'Оплачено', c: 'bg-green-100 text-green-700' },
-  PENDING: { l: 'Ожидает оплаты', c: 'bg-amber-100 text-amber-700' },
-  AWAITING_MANAGER: { l: 'У менеджера', c: 'bg-blue-100 text-blue-700' },
-  EXCLUSIVE_REQUESTED: { l: 'Запрос эксклюзива', c: 'bg-purple-100 text-purple-700' },
-  REJECTED: { l: 'Отклонено', c: 'bg-red-100 text-red-700' },
-  FULFILLED: { l: 'Выполнено', c: 'bg-green-100 text-green-700' },
+  PAID: { l: 'Оплачено', c: 'bg-black text-white' },
+  PENDING: { l: 'Ожидает оплаты', c: 'bg-gray-700 text-white' },
+  AWAITING_MANAGER: { l: 'У менеджера', c: 'bg-gray-200 text-gray-900 border border-gray-300' },
+  EXCLUSIVE_REQUESTED: { l: 'Запрос эксклюзива', c: 'bg-gray-200 text-gray-900 border border-gray-300' },
+  REJECTED: { l: 'Отклонено', c: 'bg-white text-black border-2 border-black' },
+  FULFILLED: { l: 'Выполнено', c: 'bg-black text-white' },
 };
 
 const fmtAmount = (n: number) => Math.round(n).toLocaleString('ru-RU');
@@ -81,8 +91,7 @@ export default function FinancePage() {
   return (
     <div className="space-y-6 animate-fadeInUp">
       <section
-        className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white"
-        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)' }}>
+        className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white bg-gray-900">
         <div className="relative z-10 max-w-2xl">
           <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-90">
             Финансы
@@ -112,7 +121,7 @@ export default function FinancePage() {
         <BigStat label="Всего заработано" value={`${fmtAmount(fin.totals.totalLicenseEarned + fin.totals.totalDonations)} ₽`} />
       </div>
       {!fin.payout.enabled && (
-        <section className="apple-card p-5 md:p-6 bg-amber-50 border-amber-200">
+        <section className="apple-card p-5 md:p-6 bg-gray-50 border border-gray-300">
           <div className="flex items-start gap-3">
             <div className="text-2xl"></div>
             <div className="flex-1">
@@ -208,7 +217,7 @@ export default function FinancePage() {
                         <p className="text-sm text-[var(--text-secondary)] mt-1 italic">«{d.message}»</p>
                       )}
                     </div>
-                    <div className="font-bold text-green-700 tabular-nums shrink-0">+{fmtAmount(d.amount)} ₽</div>
+                    <div className="font-bold text-gray-900 tabular-nums shrink-0">+{fmtAmount(d.amount)} ₽</div>
                   </div>
                 </div>
               );
@@ -250,8 +259,8 @@ export default function FinancePage() {
                     body: JSON.stringify({ amount: Number(withdrawAmount) }),
                   });
                   const j = await r.json();
-                  if (j.success) { alert(j.message); window.location.reload(); }
-                  else alert(j.error || 'Ошибка');
+                  if (j.success) { showBanner(j.message); window.location.reload(); }
+                  else showBanner(j.error || 'Ошибка');
                 } finally {
                   setWithdrawing(false);
                   setWithdrawOpen(false);
@@ -277,55 +286,6 @@ function BigStat({ label, value, sub, accent }: { label: string; value: string; 
       {sub && (
         <div className={`text-xs mt-1.5 ${accent ? 'text-white/70' : 'text-[var(--text-secondary)]'}`}>{sub}</div>
       )}
-    {showPayoutSetup && (
-      <PayoutSetupModal
-        onClose={() => setShowPayoutSetup(false)}
-        onDone={() => { setShowPayoutSetup(false); window.location.reload(); }}
-      />
-    )}
-    {withdrawOpen && fin && (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md" onClick={() => !withdrawing && setWithdrawOpen(false)}>
-        <div className="apple-card max-w-sm w-full p-6 shadow-2xl animate-fadeInUp" onClick={(e) => e.stopPropagation()}>
-          <h3 className="text-xl font-bold tracking-tight mb-2">Вывод средств</h3>
-          <p className="text-sm text-[var(--text-secondary)] mb-3">
-            Доступно: <strong>{fmtAmount(fin.balance)} ₽</strong>. Перевод поступит через СБП в течение 1-3 рабочих дней.
-          </p>
-          <input
-            type="number"
-            min={100}
-            max={fin.balance}
-            value={withdrawAmount}
-            onChange={(e) => setWithdrawAmount(e.target.value)}
-            placeholder={String(Math.floor(fin.balance))}
-            className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white text-sm tabular-nums mb-4"
-          />
-          <div className="flex justify-end gap-2">
-            <button onClick={() => setWithdrawOpen(false)} className="px-5 py-2.5 rounded-full bg-[var(--hover)] text-sm font-medium">Отмена</button>
-            <button
-              onClick={async () => {
-                setWithdrawing(true);
-                try {
-                  const r = await fetch('/api/author/payout/withdraw', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authStorage.getToken() || ''}` },
-                    body: JSON.stringify({ amount: Number(withdrawAmount) }),
-                  });
-                  const j = await r.json();
-                  if (j.success) { alert(j.message); window.location.reload(); }
-                  else alert(j.error || 'Ошибка');
-                } finally {
-                  setWithdrawing(false);
-                  setWithdrawOpen(false);
-                }
-              }}
-              disabled={withdrawing || !withdrawAmount || Number(withdrawAmount) < 100}
-              className="px-6 py-2.5 rounded-full bg-[var(--text-primary)] text-white text-sm font-medium disabled:opacity-40">
-              {withdrawing ? 'Отправляем…' : 'Вывести'}
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
     </div>
   );
 }

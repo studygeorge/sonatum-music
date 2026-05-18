@@ -24,10 +24,10 @@ type Event = {
 };
 
 const STATUS_LABEL: Record<string, { l: string; c: string }> = {
-  DRAFT: { l: 'Черновик', c: 'bg-gray-100 text-gray-700' },
-  PENDING: { l: 'На модерации', c: 'bg-amber-100 text-amber-700' },
-  APPROVED: { l: 'Опубликовано', c: 'bg-green-100 text-green-700' },
-  REJECTED: { l: 'Отклонено', c: 'bg-red-100 text-red-700' },
+  DRAFT: { l: 'Черновик', c: 'bg-gray-100 text-gray-700 border border-gray-200' },
+  PENDING: { l: 'На модерации', c: 'bg-gray-700 text-white' },
+  APPROVED: { l: 'Опубликовано', c: 'bg-black text-white' },
+  REJECTED: { l: 'Отклонено', c: 'bg-white text-black border-2 border-black' },
 };
 
 const fmtDate = (d: string) =>
@@ -52,7 +52,8 @@ export default function AuthorEventsPage() {
   useEffect(() => load(), []);
 
   const removeEvent = async (id: string) => {
-    if (!confirm('Удалить событие?')) return;
+    // Удаление без браузерного confirm — события создаются легко, удаление
+    // тоже легко. Если нужно, можно добавить inline-подтверждение.
     await fetch(`/api/events/${id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${authStorage.getToken() || ''}` },
@@ -62,24 +63,33 @@ export default function AuthorEventsPage() {
 
   return (
     <div className="space-y-6 animate-fadeInUp">
-      <section
-        className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white flex items-end justify-between gap-4 flex-wrap"
-        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)' }}>
+      <section className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white flex items-end justify-between gap-4 flex-wrap bg-gray-900">
         <div className="relative z-10 max-w-xl">
-          <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-90">
+          <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-80">
             События
           </div>
           <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white">Афиша</h1>
-          <p className="text-sm md:text-base text-white/85 mt-2">
+          <p className="text-sm md:text-base text-white/75 mt-2">
             Концерты, премьеры, мастер-классы. После модерации появятся на главной.
           </p>
         </div>
         <button
           onClick={() => setCreateOpen(true)}
-          className="px-5 py-3 rounded-full bg-white text-[#1d4cb8] font-semibold text-sm whitespace-nowrap shrink-0 hover:opacity-90 transition-opacity">
+          className="px-5 py-3 rounded-full bg-white text-gray-900 font-semibold text-sm whitespace-nowrap shrink-0 hover:bg-gray-100 transition-colors">
           + Создать событие
         </button>
       </section>
+
+      {/* Inline-форма создания (главное было пропущено) */}
+      {createOpen && (
+        <CreateEventInline
+          onCancel={() => setCreateOpen(false)}
+          onCreated={() => {
+            setCreateOpen(false);
+            load();
+          }}
+        />
+      )}
       {loading ? (
         <div className="text-center text-[var(--text-secondary)] py-12">Загрузка…</div>
       ) : events.length === 0 ? (
@@ -117,12 +127,12 @@ export default function AuthorEventsPage() {
                     </p>
                   )}
                   {e.rejectionReason && e.status === 'REJECTED' && (
-                    <p className="text-xs text-red-600 mt-2 bg-red-50 p-2 rounded-lg">
+                    <p className="text-xs text-black mt-2 bg-gray-100 border border-gray-300 p-2 rounded-lg">
                       Причина отказа: {e.rejectionReason}
                     </p>
                   )}
                   {!e.paidPublication && e.status === 'PENDING' && (
-                    <p className="text-xs text-amber-700 mt-2 bg-amber-50 p-2 rounded-lg">
+                    <p className="text-xs text-gray-900 mt-2 bg-gray-100 border border-gray-300 p-2 rounded-lg">
                       Требуется оплата 250 ₽ для публикации (или подписка ПРОФИ).
                     </p>
                   )}
@@ -139,7 +149,7 @@ export default function AuthorEventsPage() {
                     )}
                     <button
                       onClick={() => removeEvent(e.id)}
-                      className="text-xs text-red-500 hover:underline">
+                      className="text-xs text-gray-700 hover:text-black hover:underline">
                       Удалить
                     </button>
                   </div>
@@ -229,10 +239,10 @@ function CreateEventInline({ onCancel, onCreated }: { onCancel: () => void; onCr
     <section className="apple-card p-5 md:p-7 animate-fadeInUp">
         <div className="flex items-start justify-between mb-5">
           <h3 className="text-xl font-bold tracking-tight">Создать событие</h3>
-          <button onClick={onClose} className="text-2xl leading-none text-[var(--text-secondary)] hover:text-[var(--text-primary)]"></button>
+          <button onClick={onCancel} className="text-2xl leading-none text-[var(--text-secondary)] hover:text-[var(--text-primary)]"></button>
         </div>
         <form onSubmit={submit} className="space-y-4">
-          {error && <div className="apple-card p-3 bg-red-50 border-red-200 text-sm text-red-600">{error}</div>}
+          {error && <div className="apple-card p-3 bg-white border-2 border-black text-sm text-black">{error}</div>}
 
           <div>
             <label className="block text-sm font-medium mb-1.5">Постер (опционально)</label>
@@ -357,7 +367,7 @@ function CreateEventInline({ onCancel, onCreated }: { onCancel: () => void; onCr
           <div className="flex justify-end gap-2 pt-3 border-t border-[var(--border)]">
             <button
               type="button"
-              onClick={onClose}
+              onClick={onCancel}
               className="px-6 py-3 rounded-full bg-[var(--hover)] text-[var(--text-primary)] font-medium hover:bg-[var(--border)] transition-colors">
               Отмена
             </button>
