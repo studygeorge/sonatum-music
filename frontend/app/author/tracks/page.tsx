@@ -170,7 +170,7 @@ function AuthorTracksPageInner() {
                       {/* Опубликованный трек с ожидающими правками — отдельный бейдж */}
                       {t.status === 'PUBLISHED' && t.hasPendingChanges && (
                         <span className="text-[11px] px-2 py-0.5 rounded-full shrink-0 bg-gray-700 text-white">
-                          Правки на проверке
+                          На модерации
                         </span>
                       )}
                     </div>
