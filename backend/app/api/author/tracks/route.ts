@@ -61,11 +61,23 @@ export async function GET(request: NextRequest) {
       status: true,
       createdAt: true,
       releaseDate: true,
+      metadata: true,
     },
   });
 
+  // Достаём pending-флаг из metadata в плоский ответ
+  const enriched = tracks.map((t) => {
+    const meta = (t.metadata as any) || {};
+    const { metadata, ...rest } = t as any;
+    return {
+      ...rest,
+      hasPendingChanges: !!meta.hasPendingChanges,
+      pendingSubmittedAt: meta.pendingSubmittedAt || null,
+    };
+  });
+
   return NextResponse.json(
-    { success: true, data: tracks, artistSlug: artist.slug },
+    { success: true, data: enriched, artistSlug: artist.slug },
     { headers: cors }
   );
 }

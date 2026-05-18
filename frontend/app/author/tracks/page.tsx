@@ -26,6 +26,8 @@ type Track = {
   lyrics?: string | null;
   bpm?: number | null;
   key?: string | null;
+  hasPendingChanges?: boolean;
+  pendingSubmittedAt?: string | null;
 };
 
 // Монохромные статусы — никаких зелёных/красных/жёлтых.
@@ -163,6 +165,12 @@ function AuthorTracksPageInner() {
                       {t.status !== 'PUBLISHED' && (
                         <span className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ${s.cls}`}>
                           {s.label}
+                        </span>
+                      )}
+                      {/* Опубликованный трек с ожидающими правками — отдельный бейдж */}
+                      {t.status === 'PUBLISHED' && t.hasPendingChanges && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full shrink-0 bg-gray-700 text-white">
+                          Правки на проверке
                         </span>
                       )}
                     </div>
@@ -503,7 +511,15 @@ function EditTrackInline({
     <div className="bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-5 space-y-6">
       {track.status === 'PUBLISHED' && (
         <div className="text-xs bg-white border border-gray-200 rounded-lg p-3 text-gray-700">
-          После сохранения трек будет отправлен на повторную модерацию.
+          Опубликованная версия будет видна слушателям без изменений до тех пор,
+          пока администратор не одобрит ваши правки. Ваши изменения сохраняются
+          как «черновик правок» и не влияют на публичный трек.
+        </div>
+      )}
+      {(data as any)?.hasPendingChanges && (
+        <div className="text-xs bg-gray-100 border border-gray-300 rounded-lg p-3 text-gray-900">
+          У этого трека уже есть отправленные правки, ожидающие модерации. Любые новые изменения
+          заменят предыдущие.
         </div>
       )}
       {error && (

@@ -43,32 +43,38 @@ export async function GET(
   // Ноты, если есть
   const sheet = await prisma.sheetMusic.findUnique({ where: { trackId: params.id } });
 
-  return NextResponse.json(
-    {
-      success: true,
-      data: {
-        ...track,
-        contentType: extra.content_type,
-        originalComposer: extra.original_composer,
-        recordingYear: extra.recording_year,
-        recordingPlace: extra.recording_place,
-        era: extra.era,
-        mood: extra.mood,
-        instruments: extra.instruments,
-        difficulty: extra.difficulty,
-        tempo: extra.tempo,
-        hasMinus: extra.has_minus,
-        minusAudioUrl: extra.minus_audio_url,
-        minusPrice: extra.minus_price,
-        rightsConfirmed: extra.rights_confirmed,
-        allowDonations: extra.allow_donations,
-        allowExclusive: extra.allow_exclusive,
-        sheetUrl: sheet?.pdfUrl || null,
-        sheetMusicId: sheet?.id || null,
-      },
-    },
-    { headers: cors }
-  );
+  // Если у трека есть pendingChanges — накладываем их на ответ, чтобы автор
+  // видел свою «черновую» версию в форме редактирования (для публики
+  // эти данные не показываются — у публики свой эндпоинт без оверлея).
+  const meta = (track.metadata as any) || {};
+  const pending = meta.pendingChanges || null;
+
+  const merged: any = {
+    ...track,
+    contentType: extra.content_type,
+    originalComposer: extra.original_composer,
+    recordingYear: extra.recording_year,
+    recordingPlace: extra.recording_place,
+    era: extra.era,
+    mood: extra.mood,
+    instruments: extra.instruments,
+    difficulty: extra.difficulty,
+    tempo: extra.tempo,
+    hasMinus: extra.has_minus,
+    minusAudioUrl: extra.minus_audio_url,
+    minusPrice: extra.minus_price,
+    rightsConfirmed: extra.rights_confirmed,
+    allowDonations: extra.allow_donations,
+    allowExclusive: extra.allow_exclusive,
+    sheetUrl: sheet?.pdfUrl || null,
+    sheetMusicId: sheet?.id || null,
+    hasPendingChanges: !!meta.hasPendingChanges,
+    pendingSubmittedAt: meta.pendingSubmittedAt || null,
+  };
+  // Накладываем pending поверх current — автор редактирует свою «черновую» версию
+  if (pending) Object.assign(merged, pending);
+
+  return NextResponse.json({ success: true, data: merged }, { headers: cors });
 }
 
 // PATCH — обновление трека самим автором.
@@ -90,13 +96,113 @@ export async function PATCH(
 
   const existing: any = await prisma.track.findFirst({
     where: { id: params.id, artistId: artist.id },
-    select: { id: true, status: true, audioUrl: true, instrumentalUrl: true },
   });
   if (!existing) return NextResponse.json({ success: false, error: 'Not found or not yours' }, { status: 404, headers: cors });
 
   const body = await request.json().catch(() => ({}));
 
-  // Только разрешённые Prisma-поля
+  // Поток A: трек уже PUBLISHED — НЕ трогаем публичные поля, копим всё в
+  // metadata.pendingChanges. Аудитория продолжает видеть старую версию пока
+  // админ не одобрит. Статус остаётся PUBLISHED, но в metadata появляется
+  // hasPendingChanges=true.
+  if (existing.status === 'PUBLISHED') {
+    const pending: any = {};
+
+    // Базовые поля
+    if (typeof body.title === 'string' && body.title.trim() && body.title.trim() !== existing.title) pending.title = body.title.trim();
+    if (typeof body.lyrics === 'string' && (body.lyrics || null) !== (existing.lyrics || null)) pending.lyrics = body.lyrics || null;
+    if (typeof body.cover === 'string' && (body.cover || null) !== (existing.cover || null)) pending.cover = body.cover || null;
+    if (body.price !== undefined) {
+      const np = body.price === '' || body.price === null ? null : Number(body.price);
+      if ((existing.price ? Number(existing.price) : null) !== np) pending.price = np;
+    }
+    if (body.instrumentalPrice !== undefined) {
+      const np = body.instrumentalPrice === '' || body.instrumentalPrice === null ? null : Number(body.instrumentalPrice);
+      if ((existing.instrumentalPrice ? Number(existing.instrumentalPrice) : null) !== np) pending.instrumentalPrice = np;
+    }
+    if (body.isForSale !== undefined && !!body.isForSale !== !!existing.isForSale) pending.isForSale = !!body.isForSale;
+    if (body.isFree !== undefined && !!body.isFree !== !!existing.isFree) pending.isFree = !!body.isFree;
+    if (body.bpm !== undefined) {
+      const nb = body.bpm ? Number(body.bpm) : null;
+      if ((existing.bpm || null) !== nb) pending.bpm = nb;
+    }
+    if (body.key !== undefined && (body.key || null) !== (existing.key || null)) pending.key = body.key || null;
+    if (body.releaseDate !== undefined) pending.releaseDate = body.releaseDate || null;
+
+    // Аудио-файлы и audioType — тоже идут в pending (новый файл не должен заменять
+    // старый, пока не одобрен)
+    if (typeof body.audioUrl === 'string' && body.audioUrl && body.audioUrl !== existing.audioUrl) {
+      pending.audioUrl = body.audioUrl;
+    }
+    if (body.instrumentalUrl !== undefined && (body.instrumentalUrl || null) !== (existing.instrumentalUrl || null)) {
+      pending.instrumentalUrl = body.instrumentalUrl || null;
+    }
+    if (body.audioType && ['FULL', 'INSTRUMENTAL', 'BOTH'].includes(body.audioType) && body.audioType !== existing.audioType) {
+      pending.audioType = body.audioType;
+    }
+
+    // V2-поля (raw columns) — снимаем сначала текущие значения, потом diff
+    const [cur]: any[] = await prisma.$queryRawUnsafe(
+      `SELECT content_type, original_composer, recording_year, recording_place,
+              era, mood, instruments, difficulty, tempo,
+              allow_donations, allow_exclusive
+         FROM tracks WHERE id = $1`,
+      params.id
+    );
+    const v2map: Record<string, string> = {
+      contentType: 'content_type', originalComposer: 'original_composer',
+      recordingYear: 'recording_year', recordingPlace: 'recording_place',
+      era: 'era', mood: 'mood', instruments: 'instruments',
+      difficulty: 'difficulty', tempo: 'tempo',
+      allowDonations: 'allow_donations', allowExclusive: 'allow_exclusive',
+    };
+    for (const [camel, snake] of Object.entries(v2map)) {
+      if (body[camel] !== undefined) {
+        const newVal = body[camel];
+        const curVal = cur?.[snake];
+        if (JSON.stringify(newVal ?? null) !== JSON.stringify(curVal ?? null)) {
+          pending[camel] = newVal;
+        }
+      }
+    }
+
+    // Sheet (ноты) — диф против текущего pdfUrl
+    if (body.sheetUrl !== undefined) {
+      const sheetExists = await prisma.sheetMusic.findUnique({ where: { trackId: params.id } });
+      const cur = sheetExists?.pdfUrl || null;
+      const next = body.sheetUrl || null;
+      if (cur !== next) pending.sheetUrl = next;
+    }
+
+    // Записываем в metadata.pendingChanges, не трогая публичные поля
+    const existingMeta = (existing.metadata as any) || {};
+    const updatedMeta = {
+      ...existingMeta,
+      pendingChanges: Object.keys(pending).length > 0 ? pending : null,
+      hasPendingChanges: Object.keys(pending).length > 0,
+      pendingSubmittedAt: Object.keys(pending).length > 0 ? new Date().toISOString() : null,
+    };
+
+    const track = await prisma.track.update({
+      where: { id: params.id },
+      data: { metadata: updatedMeta },
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: track,
+        pendingChanges: pending,
+        message: Object.keys(pending).length > 0
+          ? 'Изменения отправлены на повторную модерацию. Опубликованная версия пока не меняется.'
+          : 'Нет изменений',
+      },
+      { headers: cors }
+    );
+  }
+
+  // Поток B: трек в DRAFT / PENDING / REJECTED / ARCHIVED — публики нет,
+  // правки применяем сразу.
   const data: any = {};
   if (typeof body.title === 'string' && body.title.trim()) data.title = body.title.trim();
   if (typeof body.lyrics === 'string') data.lyrics = body.lyrics || null;
@@ -109,21 +215,14 @@ export async function PATCH(
   if (body.bpm !== undefined) data.bpm = body.bpm ? Number(body.bpm) : null;
   if (body.key !== undefined) data.key = body.key || null;
 
-  // Аудио-файлы — автор может заменить основной файл или минусовку
   if (typeof body.audioUrl === 'string' && body.audioUrl) data.audioUrl = body.audioUrl;
   if (body.instrumentalUrl !== undefined) data.instrumentalUrl = body.instrumentalUrl || null;
   if (body.audioType && ['FULL', 'INSTRUMENTAL', 'BOTH'].includes(body.audioType)) {
     data.audioType = body.audioType;
   } else if (body.audioUrl || body.instrumentalUrl !== undefined) {
-    // Авто-определение типа от наличия файлов
     const hasFull = !!(body.audioUrl ?? existing.audioUrl);
     const hasInstr = !!(body.instrumentalUrl !== undefined ? body.instrumentalUrl : existing.instrumentalUrl);
     data.audioType = hasFull && hasInstr ? 'BOTH' : hasInstr && !hasFull ? 'INSTRUMENTAL' : 'FULL';
-  }
-
-  // Если редактируется опубликованный трек — отправляем обратно на модерацию
-  if (existing.status === 'PUBLISHED' && Object.keys(data).length > 0) {
-    data.status = 'PENDING';
   }
 
   const track = await prisma.track.update({
@@ -131,7 +230,7 @@ export async function PATCH(
     data,
   });
 
-  // V2-поля через raw SQL — те же что в /api/tracks/[id]/metadata
+  // V2-поля через raw SQL
   const hasExtras =
     body.contentType !== undefined || body.originalComposer !== undefined ||
     body.recordingYear !== undefined || body.recordingPlace !== undefined ||
@@ -171,7 +270,6 @@ export async function PATCH(
     );
   }
 
-  // Ноты (PDF) — добавить или обновить
   if (body.sheetUrl !== undefined) {
     const sheetExists = await prisma.sheetMusic.findUnique({ where: { trackId: params.id } });
     if (body.sheetUrl) {
@@ -193,7 +291,6 @@ export async function PATCH(
         });
       }
     } else if (sheetExists) {
-      // Пустой URL = удалить ноты
       await prisma.sheetMusic.delete({ where: { trackId: params.id } });
     }
   }
