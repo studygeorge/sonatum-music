@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { usePlayer } from '@/context/PlayerContext';
 import Link from 'next/link';
 import { api } from '@/app/lib/api';
@@ -413,16 +414,20 @@ export default function TrackPage({ params }: { params: { id: string } }) {
          </div>
       </div>
 
-      {/* Модалка жалобы */}
-      {reportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 backdrop-apple" onClick={() => setReportModalOpen(false)}></div>
-          <div className="apple-card bg-[var(--surface)] p-8 w-full max-w-md relative z-10 animate-fadeInUp shadow-2xl border border-[var(--border)]">
-            <h2 className="text-2xl font-bold mb-6 text-[var(--text-primary)]">Жалоба / Обращение</h2>
-            <select 
+      {/* Модалка жалобы — через portal в body, чтобы родительские
+         transform/backdrop-filter не ломали fixed-позиционирование */}
+      {reportModalOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          style={{ top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setReportModalOpen(false)} />
+          <div className="bg-white p-8 w-full max-w-md relative z-10 rounded-2xl shadow-2xl border border-gray-200">
+            <h2 className="text-2xl font-bold mb-6 text-gray-900">Жалоба / Обращение</h2>
+            <select
               value={reportReason}
               onChange={(e) => setReportReason(e.target.value)}
-              className="w-full p-3 rounded-xl border border-[var(--border)] bg-[var(--background)] mb-4 outline-none focus:ring-2 focus:ring-[var(--accent)]"
+              className="w-full p-3 rounded-xl border border-gray-300 bg-white mb-4 outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-900"
             >
               <option value="COPYRIGHT">Нарушение авторских прав (DMCA)</option>
               <option value="INAPPROPRIATE">Оскорбительный контент</option>
@@ -430,18 +435,29 @@ export default function TrackPage({ params }: { params: { id: string } }) {
               <option value="TECHNICAL">Техническая проблема</option>
               <option value="OTHER">Другое</option>
             </select>
-            <textarea 
+            <textarea
               value={reportDetails}
               onChange={(e) => setReportDetails(e.target.value)}
-              placeholder="Опишите проблему подробно..." 
-              className="w-full p-3 rounded-xl border border-[var(--border)] bg-[var(--background)] mb-6 outline-none min-h-[120px] resize-none focus:ring-2 focus:ring-[var(--accent)]"
-            ></textarea>
+              placeholder="Опишите проблему подробно..."
+              className="w-full p-3 rounded-xl border border-gray-300 bg-white mb-6 outline-none min-h-[120px] resize-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-900"
+            />
             <div className="flex justify-end gap-3">
-              <button className="apple-button-secondary" onClick={() => setReportModalOpen(false)}>Отмена</button>
-              <button className="bg-black text-white px-6 py-2 rounded-full font-medium hover:bg-gray-800 transition-colors" onClick={submitReport}>Отправить</button>
+              <button
+                className="px-5 py-2 rounded-full font-medium text-gray-900 bg-gray-100 hover:bg-gray-200 transition-colors"
+                onClick={() => setReportModalOpen(false)}
+              >
+                Отмена
+              </button>
+              <button
+                className="bg-black text-white px-6 py-2 rounded-full font-medium hover:bg-gray-800 transition-colors"
+                onClick={submitReport}
+              >
+                Отправить
+              </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </main>
   );
