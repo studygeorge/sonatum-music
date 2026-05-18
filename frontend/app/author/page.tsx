@@ -75,24 +75,46 @@ export default function AuthorOverviewPage() {
 
   return (
     <div className="space-y-6 animate-fadeInUp">
-      <section className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white bg-gray-900 flex items-center gap-5">
-        {/* Аватар в шапке */}
-        <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white/10 border border-white/20 overflow-hidden shrink-0 flex items-center justify-center text-3xl font-bold text-white/70">
+      <section
+        className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white flex items-center gap-5"
+        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)' }}>
+        {/* Аватарка-кнопка в шапке: клик → выбор файла → загрузка */}
+        <label
+          className="group relative w-20 h-20 md:w-24 md:h-24 rounded-full bg-white/10 border-2 border-white/30 overflow-hidden shrink-0 flex items-center justify-center text-3xl font-bold text-white/80 cursor-pointer hover:bg-white/20 transition-colors"
+          title={avatarUploading ? 'Загрузка…' : me.artist?.avatar ? 'Заменить фото' : 'Загрузить фото'}>
           {me.artist?.avatar ? (
             <img src={me.artist.avatar} alt="" className="w-full h-full object-cover" />
           ) : (
             <span>{(displayName || '?').trim()[0]?.toUpperCase() || '?'}</span>
           )}
-        </div>
+          {/* Hover-оверлей с иконкой камеры */}
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+            {avatarUploading ? (
+              <span className="text-xs font-medium">...</span>
+            ) : (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                <circle cx="12" cy="13" r="4" />
+              </svg>
+            )}
+          </div>
+          <input
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/webp"
+            className="hidden"
+            disabled={avatarUploading}
+            onChange={(e) => uploadAvatar(e.target.files?.[0] || null)}
+          />
+        </label>
         <div className="relative z-10 max-w-2xl">
-          <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-80">
+          <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-90">
             Кабинет автора
           </div>
           <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white">
             {displayName}
           </h1>
           {bio && (
-            <p className="text-sm md:text-base text-white/75 max-w-xl mt-3 line-clamp-2">
+            <p className="text-sm md:text-base text-white/85 max-w-xl mt-3 line-clamp-2">
               {bio}
             </p>
           )}
@@ -142,49 +164,47 @@ export default function AuthorOverviewPage() {
         <section className="apple-card p-6 space-y-5">
           <h2 className="text-xl font-bold tracking-tight">Профиль</h2>
 
-          {/* Фото профиля */}
+          {/* Фото профиля — клик по кружку открывает выбор файла */}
           <div className="flex items-center gap-5 pb-5 border-b border-[var(--border)]">
-            <div className="w-24 h-24 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center text-2xl font-bold text-gray-400">
+            <label
+              className="group relative w-24 h-24 rounded-full bg-gray-100 border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center text-2xl font-bold text-gray-400 cursor-pointer"
+              title={avatarUploading ? 'Загрузка…' : me.artist.avatar ? 'Заменить фото' : 'Загрузить фото'}>
               {me.artist.avatar ? (
                 <img src={me.artist.avatar} alt="" className="w-full h-full object-cover" />
               ) : (
                 <span>{(me.artist.name || '?').trim()[0]?.toUpperCase() || '?'}</span>
               )}
-            </div>
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                {avatarUploading ? (
+                  <span className="text-xs font-medium">...</span>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                )}
+              </div>
+              <input
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                className="hidden"
+                disabled={avatarUploading}
+                onChange={(e) => uploadAvatar(e.target.files?.[0] || null)}
+              />
+            </label>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold text-gray-900 mb-0.5">Фото профиля</div>
               <p className="text-xs text-gray-600 mb-3">
-                JPG, PNG или WebP до 5 МБ. Показывается на странице артиста и в каталоге.
+                Кликните на кружок, чтобы загрузить или заменить фото. JPG, PNG или WebP до 5 МБ.
               </p>
-              <div className="flex flex-wrap gap-2">
-                <label
-                  className={`px-4 py-2 rounded-full text-sm font-medium cursor-pointer transition-colors ${
-                    avatarUploading
-                      ? 'bg-gray-200 text-gray-500'
-                      : 'bg-black text-white hover:bg-gray-800'
-                  }`}>
-                  {avatarUploading
-                    ? 'Загрузка…'
-                    : me.artist.avatar
-                    ? 'Заменить фото'
-                    : 'Загрузить фото'}
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/webp"
-                    className="hidden"
-                    disabled={avatarUploading}
-                    onChange={(e) => uploadAvatar(e.target.files?.[0] || null)}
-                  />
-                </label>
-                {me.artist.avatar && !avatarUploading && (
-                  <button
-                    type="button"
-                    onClick={removeAvatar}
-                    className="px-4 py-2 rounded-full text-sm font-medium bg-white text-gray-900 border border-gray-300 hover:bg-gray-100 transition-colors">
-                    Убрать
-                  </button>
-                )}
-              </div>
+              {me.artist.avatar && !avatarUploading && (
+                <button
+                  type="button"
+                  onClick={removeAvatar}
+                  className="px-4 py-2 rounded-full text-sm font-medium bg-white text-gray-900 border border-gray-300 hover:bg-gray-100 transition-colors">
+                  Убрать фото
+                </button>
+              )}
             </div>
           </div>
 
