@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface Props {
   file: File;
@@ -197,8 +198,15 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
   const cy = STAGE / 2;
   const half = circle / 2;
 
-  return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/85">
+  // Через portal в body — иначе родительские transform/backdrop-filter
+  // (например GrainientBackground, плеер, navbar) создают свой containing block
+  // и наш `fixed` не покрывает viewport.
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 flex items-center justify-center bg-black/85"
+      style={{ zIndex: 2147483647, top: 0, left: 0, right: 0, bottom: 0 }}>
       <button
         type="button"
         onClick={onCancel}
@@ -280,7 +288,8 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
         className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/70 hover:text-white text-sm uppercase tracking-widest">
         Сброс
       </button>
-    </div>
+    </div>,
+    document.body
   );
 }
 
