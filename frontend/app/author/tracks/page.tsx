@@ -48,7 +48,7 @@ function AuthorTracksPageInner() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'ALL' | 'PUBLISHED' | 'PENDING' | 'DRAFT' | 'REJECTED'>('ALL');
-  const [editing, setEditing] = useState<Track | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const justUploaded = sp.get('uploaded') === '1';
 
   const load = () => {
@@ -70,11 +70,11 @@ function AuthorTracksPageInner() {
 
   const onSaved = (updated: Track) => {
     setTracks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
-    setEditing(null);
+    setExpandedId(null);
   };
   const onDeleted = (id: string) => {
     setTracks((prev) => prev.filter((t) => t.id !== id));
-    setEditing(null);
+    setExpandedId(null);
   };
 
   return (
@@ -85,8 +85,7 @@ function AuthorTracksPageInner() {
         </div>
       )}
 
-      <section
-        className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white flex items-end justify-between gap-4 bg-gray-900">
+      <section className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white flex items-end justify-between gap-4 bg-gray-900">
         <div className="relative z-10 max-w-xl">
           <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-80">
             Дискография
@@ -142,73 +141,96 @@ function AuthorTracksPageInner() {
         <div className="apple-card overflow-hidden">
           {filtered.map((t) => {
             const s = STATUS_LABEL[t.status] || STATUS_LABEL.DRAFT;
+            const expanded = expandedId === t.id;
             return (
-              <div
-                key={t.id}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--hover)] transition-colors border-b border-[var(--border)] last:border-b-0">
-                <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center text-sm font-bold text-gray-400">
-                  {t.cover ? (
-                    <img src={t.cover} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span>{(t.title || '?').trim()[0]?.toUpperCase() || '?'}</span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold truncate">{t.title}</span>
-                    <span className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ${s.cls}`}>
-                      {s.label}
-                    </span>
-                  </div>
-                  <div className="text-xs text-[var(--text-secondary)] mt-0.5 flex items-center gap-3 flex-wrap">
-                    <span>{fmtDuration(t.duration)}</span>
-                    <span>· {t.playCount.toLocaleString('ru-RU')} прослушиваний</span>
-                    <span>· {t.purchaseCount} продаж</span>
-                    {t.price && Number(t.price) > 0 && (
-                      <span>· {Number(t.price).toLocaleString('ru-RU')} ₽</span>
+              <div key={t.id} className="border-b border-[var(--border)] last:border-b-0">
+                <div
+                  className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                    expanded ? 'bg-[var(--hover)]' : 'hover:bg-[var(--hover)]'
+                  }`}>
+                  <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center text-sm font-bold text-gray-400">
+                    {t.cover ? (
+                      <img src={t.cover} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span>{(t.title || '?').trim()[0]?.toUpperCase() || '?'}</span>
                     )}
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold truncate">{t.title}</span>
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ${s.cls}`}>
+                        {s.label}
+                      </span>
+                    </div>
+                    <div className="text-xs text-[var(--text-secondary)] mt-0.5 flex items-center gap-3 flex-wrap">
+                      <span>{fmtDuration(t.duration)}</span>
+                      <span>· {t.playCount.toLocaleString('ru-RU')} прослушиваний</span>
+                      <span>· {t.purchaseCount} продаж</span>
+                      {t.price && Number(t.price) > 0 && (
+                        <span>· {Number(t.price).toLocaleString('ru-RU')} ₽</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => setExpandedId(expanded ? null : t.id)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                        expanded
+                          ? 'bg-black text-white hover:bg-gray-800'
+                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                      }`}
+                      title={expanded ? 'Свернуть' : 'Редактировать'}>
+                      {expanded ? 'Свернуть' : 'Редактировать'}
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className={`transition-transform ${expanded ? 'rotate-180' : ''}`}>
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </button>
+                    <Link
+                      href={`/tracks/${t.slug}`}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors hidden sm:inline-block">
+                      Открыть
+                    </Link>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    onClick={() => setEditing(t)}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-900 hover:bg-gray-200 transition-colors">
-                    Редактировать
-                  </button>
-                  <Link
-                    href={`/tracks/${t.slug}`}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors hidden sm:inline-block">
-                    Открыть
-                  </Link>
-                </div>
+
+                {/* Inline-форма редактирования — раскрывается под строкой,
+                   ничего не перекрывает плеер и навигацию */}
+                {expanded && (
+                  <EditTrackInline
+                    track={t}
+                    onSaved={onSaved}
+                    onDeleted={onDeleted}
+                    onClose={() => setExpandedId(null)}
+                  />
+                )}
               </div>
             );
           })}
         </div>
       )}
-
-      {editing && (
-        <EditTrackDialog
-          track={editing}
-          onClose={() => setEditing(null)}
-          onSaved={onSaved}
-          onDeleted={onDeleted}
-        />
-      )}
     </div>
   );
 }
 
-function EditTrackDialog({
+function EditTrackInline({
   track,
-  onClose,
   onSaved,
   onDeleted,
+  onClose,
 }: {
   track: Track;
-  onClose: () => void;
   onSaved: (t: Track) => void;
   onDeleted: (id: string) => void;
+  onClose: () => void;
 }) {
   const [title, setTitle] = useState(track.title || '');
   const [lyrics, setLyrics] = useState(track.lyrics || '');
@@ -277,148 +299,148 @@ function EditTrackDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ inset: 0 }}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="bg-white rounded-2xl w-full max-w-xl relative z-10 shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
-          <h2 className="text-lg font-bold text-gray-900">Редактирование трека</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-900 text-2xl leading-none">×</button>
+    <div className="bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-5 space-y-4">
+      {track.status === 'PUBLISHED' && (
+        <div className="text-xs bg-white border border-gray-200 rounded-lg p-3 text-gray-700">
+          После сохранения трек будет отправлен на повторную модерацию.
         </div>
+      )}
+      {error && (
+        <div className="text-sm bg-white border-2 border-black rounded-lg p-3 text-black">{error}</div>
+      )}
 
-        <div className="px-6 py-5 space-y-4">
-          {track.status === 'PUBLISHED' && (
-            <div className="text-xs bg-gray-100 border border-gray-200 rounded-lg p-3 text-gray-700">
-              После сохранения трек будет отправлен на повторную модерацию.
-            </div>
-          )}
-          {error && (
-            <div className="text-sm bg-white border-2 border-black rounded-lg p-3 text-black">{error}</div>
-          )}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Название</label>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+        />
+      </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Название</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Цена (₽)</label>
-              <input
-                type="number"
-                min="0"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="не продаётся"
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Цена минусовки (₽)</label>
-              <input
-                type="number"
-                min="0"
-                value={instrumentalPrice}
-                onChange={(e) => setInstrumentalPrice(e.target.value)}
-                placeholder="нет минусовки"
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">BPM</label>
-              <input
-                type="number"
-                value={bpm}
-                onChange={(e) => setBpm(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Тональность</label>
-              <input
-                value={musKey}
-                onChange={(e) => setMusKey(e.target.value)}
-                placeholder="C, G♭, Am..."
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">URL обложки</label>
-            <input
-              value={cover}
-              onChange={(e) => setCover(e.target.value)}
-              placeholder="/images/cover.jpg или https://..."
-              className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Текст</label>
-            <textarea
-              value={lyrics}
-              onChange={(e) => setLyrics(e.target.value)}
-              rows={6}
-              className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none resize-none"
-            />
-          </div>
-
-          <div className="flex gap-4 flex-wrap">
-            <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
-              <input type="checkbox" checked={isForSale} onChange={(e) => setIsForSale(e.target.checked)} className="accent-black" />
-              Продаётся
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
-              <input type="checkbox" checked={isFree} onChange={(e) => setIsFree(e.target.checked)} className="accent-black" />
-              Бесплатно
-            </label>
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Цена основной версии (₽)</label>
+          <input
+            type="number"
+            min="0"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="не продаётся"
+            className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+          />
         </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Цена минусовки (₽)</label>
+          <input
+            type="number"
+            min="0"
+            value={instrumentalPrice}
+            onChange={(e) => setInstrumentalPrice(e.target.value)}
+            placeholder="нет минусовки"
+            className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+          />
+        </div>
+      </div>
 
-        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between rounded-b-2xl">
-          {confirmDelete ? (
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-700">Удалить трек насовсем?</span>
-              <button
-                onClick={remove}
-                disabled={deleting}
-                className="px-3 py-1.5 rounded-lg bg-black text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-50">
-                Удалить
-              </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-900 text-sm font-medium hover:bg-gray-200">
-                Отмена
-              </button>
-            </div>
-          ) : (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">BPM</label>
+          <input
+            type="number"
+            value={bpm}
+            onChange={(e) => setBpm(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Тональность</label>
+          <input
+            value={musKey}
+            onChange={(e) => setMusKey(e.target.value)}
+            placeholder="C, G♭, Am..."
+            className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">URL обложки</label>
+        <input
+          value={cover}
+          onChange={(e) => setCover(e.target.value)}
+          placeholder="/images/cover.jpg или https://..."
+          className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Текст</label>
+        <textarea
+          value={lyrics}
+          onChange={(e) => setLyrics(e.target.value)}
+          rows={5}
+          className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none resize-none"
+        />
+      </div>
+
+      <div className="flex gap-4 flex-wrap">
+        <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isForSale}
+            onChange={(e) => setIsForSale(e.target.checked)}
+            className="accent-black"
+          />
+          Продаётся
+        </label>
+        <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isFree}
+            onChange={(e) => setIsFree(e.target.checked)}
+            className="accent-black"
+          />
+          Бесплатно
+        </label>
+      </div>
+
+      <div className="flex items-center justify-between flex-wrap gap-3 pt-3 border-t border-gray-200">
+        {confirmDelete ? (
+          <div className="flex items-center gap-2 text-sm flex-wrap">
+            <span className="text-gray-700">Удалить трек насовсем?</span>
             <button
-              onClick={() => setConfirmDelete(true)}
-              className="text-sm text-gray-500 hover:text-black underline underline-offset-2">
-              Удалить трек
+              onClick={remove}
+              disabled={deleting}
+              className="px-3 py-1.5 rounded-lg bg-black text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-50">
+              {deleting ? 'Удаляем…' : 'Удалить'}
             </button>
-          )}
-
-          <div className="flex gap-2">
             <button
-              onClick={onClose}
-              className="px-5 py-2 rounded-full bg-gray-100 text-gray-900 font-medium hover:bg-gray-200 transition-colors">
+              onClick={() => setConfirmDelete(false)}
+              className="px-3 py-1.5 rounded-lg bg-white border border-gray-300 text-gray-900 text-sm font-medium hover:bg-gray-100">
               Отмена
             </button>
-            <button
-              onClick={save}
-              disabled={saving}
-              className="px-6 py-2 rounded-full bg-black text-white font-medium hover:bg-gray-800 transition-colors disabled:opacity-50">
-              {saving ? 'Сохраняем…' : 'Сохранить'}
-            </button>
           </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="text-sm text-gray-500 hover:text-black underline underline-offset-2">
+            Удалить трек
+          </button>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 rounded-full bg-white border border-gray-300 text-gray-900 font-medium hover:bg-gray-100 transition-colors">
+            Отмена
+          </button>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="px-6 py-2 rounded-full bg-black text-white font-medium hover:bg-gray-800 transition-colors disabled:opacity-50">
+            {saving ? 'Сохраняем…' : 'Сохранить'}
+          </button>
         </div>
       </div>
     </div>
