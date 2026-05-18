@@ -13,9 +13,12 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  return withRole(request, ['ADMIN', 'SUPER_ADMIN'], async () => {
+  return withRole(request, ['ADMIN', 'SUPER_ADMIN'], async (req, session) => {
     try {
-      const track: any = await prisma.track.findUnique({ where: { id: params.id } });
+      const track: any = await prisma.track.findUnique({
+        where: { id: params.id },
+        include: { artist: { select: { userId: true } } },
+      });
       if (!track) return NextResponse.json({ success: false, error: 'Трек не найден' }, { status: 404 });
 
       const meta = (track.metadata as any) || {};
@@ -95,13 +98,16 @@ export async function POST(
           if (sheetExists) {
             await prisma.sheetMusic.update({ where: { trackId: params.id }, data: { pdfUrl: sheetUrl } });
           } else {
+            // uploaderId должен быть userId (а НЕ artistId). Берём userId автора
+            // если он есть, иначе текущего админа.
+            const uploaderId = track.artist?.userId || session.userId;
             await prisma.sheetMusic.create({
               data: {
                 trackId: params.id,
                 pdfUrl: sheetUrl,
                 title: track.title,
                 composerId: track.artistId,
-                uploaderId: track.artistId, // запасной вариант, точнее uploaderId недоступен здесь
+                uploaderId,
                 instrument: 'Не указан',
               },
             });
