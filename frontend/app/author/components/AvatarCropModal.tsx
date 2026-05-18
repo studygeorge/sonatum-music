@@ -8,28 +8,43 @@ interface Props {
   onDone: (blob: Blob) => void;
 }
 
-const CIRCLE = 320; // диаметр круглой области выбора
-const OUTPUT = 512; // итоговый размер аватарки
+const DEFAULT_CIRCLE = 320;
+const MIN_CIRCLE = 100;
+const STAGE_PAD = 60; // отступ от края stage до квадрата кропа
+const OUTPUT = 512;
 
-// Telegram-style кадрировщик:
-// - картинка занимает всё окно, поверх — затемнение с круглым «окошком»
-// - перетаскивание (мышка / палец) → перемещение
-// - колесо мыши / пинч → зум, БЕЗ ползунка
-// - угловые скобки показывают границу видимой области
-// - кнопка "Сброс" возвращает в начальное положение
+// Telegram-style:
+// - изображение можно drag/zoom
+// - круглый кроп с угловыми скобками
+// - УГЛОВЫЕ СКОБКИ — это ручки изменения размера кропа (drag за угол → круг меняет размер)
 export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
   const [src, setSrc] = useState<string>('');
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [circle, setCircle] = useState(DEFAULT_CIRCLE);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [natural, setNatural] = useState({ w: 0, h: 0 });
   const [busy, setBusy] = useState(false);
 
-  // Drag state
+  // Контейнер кадрировщика — фиксированный размер, респонсивно ограничен viewport через CSS
+  const [STAGE, setStage] = useState(560);
+  useEffect(() => {
+    const calc = () => setStage(Math.min(window.innerWidth - 40, window.innerHeight - 140, 560));
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
+  }, []);
+
+  // Drag state (для перемещения картинки)
   const dragRef = useRef<{ x: number; y: number; ox: number; oy: number; active: boolean }>({
     x: 0, y: 0, ox: 0, oy: 0, active: false,
   });
+  // Pinch state (для зума на мобиле)
   const pinchRef = useRef<{ d: number; s: number; active: boolean }>({ d: 0, s: 1, active: false });
+  // Resize state (для изменения размера кропа за угол)
+  const resizeRef = useRef<{ x: number; y: number; c: number; corner: string; active: boolean }>({
+    x: 0, y: 0, c: 0, corner: '', active: false,
+  });
 
   useEffect(() => {
     const url = URL.createObjectURL(file);
@@ -41,38 +56,68 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
     const img = e.currentTarget;
     setNatural({ w: img.naturalWidth, h: img.naturalHeight });
     const minSide = Math.min(img.naturalWidth, img.naturalHeight);
-    const fit = CIRCLE / minSide;
+    const fit = DEFAULT_CIRCLE / minSide;
     setScale(fit);
     setOffset({ x: 0, y: 0 });
+    setCircle(DEFAULT_CIRCLE);
   };
 
-  // Минимальный масштаб: позволяем сильно уменьшить (картинка может быть меньше круга)
   const minScale = () => 0.05;
+  const maxScale = () => {
+    if (!natural.w || !natural.h) return 10;
+    const minSide = Math.min(natural.w, natural.h);
+    return (circle * 10) / minSide;
+  };
   const fitScale = () => {
     if (!natural.w || !natural.h) return 1;
     const minSide = Math.min(natural.w, natural.h);
-    return CIRCLE / minSide;
+    return circle / minSide;
   };
-  const maxScale = () => fitScale() * 10;
 
-  // PC drag
-  const onPointerDown = (e: React.PointerEvent) => {
+  // Drag по картинке (на любом месте кроме угловых ручек)
+  const onStagePointerDown = (e: React.PointerEvent) => {
     if (pinchRef.current.active) return;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     dragRef.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y, active: true };
   };
-  const onPointerMove = (e: React.PointerEvent) => {
+  const onStagePointerMove = (e: React.PointerEvent) => {
+    if (resizeRef.current.active) return;
     if (!dragRef.current.active) return;
     const dx = e.clientX - dragRef.current.x;
     const dy = e.clientY - dragRef.current.y;
     setOffset({ x: dragRef.current.ox + dx, y: dragRef.current.oy + dy });
   };
-  const onPointerUp = (e: React.PointerEvent) => {
+  const onStagePointerUp = (e: React.PointerEvent) => {
     dragRef.current.active = false;
     try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
   };
 
-  // Pinch zoom (mobile)
+  // Resize за угол: новый радиус = расстояние от центра до точки * 1.41 (диагональ)
+  // упрощённо: dist между указателем и центром, в обе стороны
+  const startResize = (corner: string) => (e: React.PointerEvent) => {
+    e.stopPropagation();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    resizeRef.current = { x: e.clientX, y: e.clientY, c: circle, corner, active: true };
+  };
+  const onResizePointerMove = (e: React.PointerEvent) => {
+    if (!resizeRef.current.active) return;
+    const dx = e.clientX - resizeRef.current.x;
+    const dy = e.clientY - resizeRef.current.y;
+    // Направление: для tl/bl уменьшение по +X, для tr/br увеличение по +X. Знак подбираем по углу.
+    const corner = resizeRef.current.corner;
+    const sx = corner.includes('l') ? -1 : 1;
+    const sy = corner.includes('t') ? -1 : 1;
+    // Усреднённое изменение по диагонали — берём средний рост из двух осей
+    const delta = (dx * sx + dy * sy);
+    const next = clamp(resizeRef.current.c + delta, MIN_CIRCLE, STAGE - STAGE_PAD * 2);
+    setCircle(next);
+  };
+  const onResizePointerUp = (e: React.PointerEvent) => {
+    resizeRef.current.active = false;
+    try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+  };
+
+  // Pinch
   const onTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       const [a, b] = [e.touches[0], e.touches[1]];
@@ -90,11 +135,11 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
       setScale(clamp(ns, minScale(), maxScale()));
     }
   };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (e.touches.length < 2) pinchRef.current.active = false;
+  const onTouchEnd = () => {
+    pinchRef.current.active = false;
   };
 
-  // Wheel zoom — native listener с {passive:false}, иначе preventDefault не работает
+  // Wheel zoom: native listener с {passive:false}
   const stageRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = stageRef.current;
@@ -106,14 +151,14 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
     };
     el.addEventListener('wheel', handler, { passive: false });
     return () => el.removeEventListener('wheel', handler);
-  }, [natural.w, natural.h]);
+  }, [natural.w, natural.h, circle]);
 
   const reset = () => {
     setScale(fitScale());
     setOffset({ x: 0, y: 0 });
+    setCircle(DEFAULT_CIRCLE);
   };
 
-  // Финальная отрисовка: квадрат 512×512, обрезанный кругом
   const confirm = async () => {
     if (!imgRef.current) return;
     setBusy(true);
@@ -129,7 +174,7 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
       ctx.closePath();
       ctx.clip();
 
-      const k = OUTPUT / CIRCLE;
+      const k = OUTPUT / circle;
       const drawW = natural.w * scale * k;
       const drawH = natural.h * scale * k;
       const cx = OUTPUT / 2 + offset.x * k;
@@ -146,23 +191,20 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
     }
   };
 
-  // Размер контейнера — больше круга, чтобы оставить место для скобок и затемнения
-  const CONTAINER = CIRCLE + 80;
-
-  // Картинка на экране
   const imgW = natural.w * scale;
   const imgH = natural.h * scale;
+  const cx = STAGE / 2;
+  const cy = STAGE / 2;
+  const half = circle / 2;
 
   return (
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/85">
-      {/* Header — закрыть */}
       <button
         type="button"
         onClick={onCancel}
         className="absolute top-4 left-4 text-white/80 hover:text-white text-3xl leading-none w-10 h-10 flex items-center justify-center">
         ×
       </button>
-      {/* Готово */}
       <button
         type="button"
         onClick={confirm}
@@ -171,15 +213,23 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
         {busy ? 'Сохраняем…' : 'Готово'}
       </button>
 
-      {/* Сам кадрировщик */}
       <div
         ref={stageRef}
         className="relative overflow-hidden select-none touch-none"
-        style={{ width: CONTAINER, height: CONTAINER, maxWidth: '100vw', maxHeight: '100vh' }}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        style={{ width: STAGE, height: STAGE, maxWidth: '100vw', maxHeight: '100vh' }}
+        onPointerDown={onStagePointerDown}
+        onPointerMove={(e) => {
+          onStagePointerMove(e);
+          onResizePointerMove(e);
+        }}
+        onPointerUp={(e) => {
+          onStagePointerUp(e);
+          onResizePointerUp(e);
+        }}
+        onPointerCancel={(e) => {
+          onStagePointerUp(e);
+          onResizePointerUp(e);
+        }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}>
@@ -193,39 +243,37 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
             draggable={false}
             style={{
               position: 'absolute',
-              left: CONTAINER / 2 - imgW / 2 + offset.x,
-              top: CONTAINER / 2 - imgH / 2 + offset.y,
+              left: cx - imgW / 2 + offset.x,
+              top: cy - imgH / 2 + offset.y,
               width: imgW,
               height: imgH,
               userSelect: 'none',
               pointerEvents: 'none',
               maxWidth: 'none',
-              cursor: 'grab',
             }}
           />
         )}
 
-        {/* Затемнение с круглым окном (box-shadow trick) */}
+        {/* Затемнение с круглым окном */}
         <div
           className="absolute rounded-full pointer-events-none"
           style={{
-            left: CONTAINER / 2 - CIRCLE / 2,
-            top: CONTAINER / 2 - CIRCLE / 2,
-            width: CIRCLE,
-            height: CIRCLE,
+            left: cx - half,
+            top: cy - half,
+            width: circle,
+            height: circle,
             boxShadow: '0 0 0 9999px rgba(0,0,0,0.65)',
             border: '1px solid rgba(255,255,255,0.15)',
           }}
         />
 
-        {/* Угловые скобки вокруг круга */}
-        <CropBracket pos="tl" />
-        <CropBracket pos="tr" />
-        <CropBracket pos="bl" />
-        <CropBracket pos="br" />
+        {/* Угловые скобки — теперь ручки для изменения размера круга */}
+        <CornerHandle corner="tl" cx={cx} cy={cy} half={half} onDown={startResize('tl')} />
+        <CornerHandle corner="tr" cx={cx} cy={cy} half={half} onDown={startResize('tr')} />
+        <CornerHandle corner="bl" cx={cx} cy={cy} half={half} onDown={startResize('bl')} />
+        <CornerHandle corner="br" cx={cx} cy={cy} half={half} onDown={startResize('br')} />
       </div>
 
-      {/* Сброс */}
       <button
         type="button"
         onClick={reset}
@@ -236,35 +284,50 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
   );
 }
 
-function CropBracket({ pos }: { pos: 'tl' | 'tr' | 'bl' | 'br' }) {
-  // Скобка: 2 белые линии в углу 24x24, угол к центру круга
-  const CONTAINER = CIRCLE + 80;
-  const inset = CONTAINER / 2 - CIRCLE / 2; // отступ от края контейнера до круга
+function CornerHandle({
+  corner, cx, cy, half, onDown,
+}: {
+  corner: 'tl' | 'tr' | 'bl' | 'br';
+  cx: number; cy: number; half: number;
+  onDown: (e: React.PointerEvent) => void;
+}) {
   const size = 22;
-  const off = inset - 6;
-  const isTop = pos.startsWith('t');
-  const isLeft = pos.endsWith('l');
-  const pad: any = {};
-  if (isTop) pad.top = off; else pad.bottom = off;
-  if (isLeft) pad.left = off; else pad.right = off;
+  const lineLen = 22;
+  const isTop = corner.startsWith('t');
+  const isLeft = corner.endsWith('l');
+  // Позиция: внешний угол вписанного в круг квадрата
+  const left = isLeft ? cx - half : cx + half - size;
+  const top = isTop ? cy - half : cy + half - size;
+  // Большая невидимая зона хвата + видимые две белые линии
+  const hitPad = 14;
   return (
-    <div className="absolute pointer-events-none" style={{ ...pad, width: size, height: size }}>
+    <div
+      className="absolute"
+      style={{
+        left: left - hitPad,
+        top: top - hitPad,
+        width: size + hitPad * 2,
+        height: size + hitPad * 2,
+        cursor: isTop === isLeft ? 'nwse-resize' : 'nesw-resize',
+      }}
+      onPointerDown={onDown}>
+      {/* Видимые линии скобки внутри хит-зоны */}
       <div
         className="absolute bg-white"
         style={{
-          width: 2,
-          height: size,
-          ...(isLeft ? { left: 0 } : { right: 0 }),
-          ...(isTop ? { top: 0 } : { bottom: 0 }),
+          width: 3,
+          height: lineLen,
+          ...(isLeft ? { left: hitPad } : { right: hitPad }),
+          ...(isTop ? { top: hitPad } : { bottom: hitPad }),
         }}
       />
       <div
         className="absolute bg-white"
         style={{
-          height: 2,
-          width: size,
-          ...(isLeft ? { left: 0 } : { right: 0 }),
-          ...(isTop ? { top: 0 } : { bottom: 0 }),
+          height: 3,
+          width: lineLen,
+          ...(isLeft ? { left: hitPad } : { right: hitPad }),
+          ...(isTop ? { top: hitPad } : { bottom: hitPad }),
         }}
       />
     </div>
