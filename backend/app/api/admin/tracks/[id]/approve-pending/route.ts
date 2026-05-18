@@ -91,28 +91,46 @@ export async function POST(
         );
       }
 
-      // Ноты
-      if (sheetUrl !== undefined) {
+      // Ноты — PDF + метаданные (instrument, difficulty, price, isPublicDomain)
+      const sheetTouched =
+        sheetUrl !== undefined || pending.sheetInstrument !== undefined ||
+        pending.sheetDifficulty !== undefined || pending.sheetPrice !== undefined ||
+        pending.sheetIsPublicDomain !== undefined;
+
+      if (sheetTouched) {
         const sheetExists = await prisma.sheetMusic.findUnique({ where: { trackId: params.id } });
-        if (sheetUrl) {
+        const finalUrl = sheetUrl !== undefined ? (sheetUrl || null) : (sheetExists?.pdfUrl || null);
+
+        if (finalUrl) {
+          const sheetData: any = { pdfUrl: finalUrl };
+          if (pending.sheetInstrument !== undefined) sheetData.instrument = pending.sheetInstrument || 'Не указан';
+          if (pending.sheetDifficulty !== undefined && ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'].includes(pending.sheetDifficulty)) {
+            sheetData.difficulty = pending.sheetDifficulty;
+          }
+          if (pending.sheetPrice !== undefined) {
+            sheetData.price = pending.sheetPrice === '' || pending.sheetPrice === null ? null : Number(pending.sheetPrice);
+          }
+          if (pending.sheetIsPublicDomain !== undefined) sheetData.isPublicDomain = !!pending.sheetIsPublicDomain;
+
           if (sheetExists) {
-            await prisma.sheetMusic.update({ where: { trackId: params.id }, data: { pdfUrl: sheetUrl } });
+            await prisma.sheetMusic.update({ where: { trackId: params.id }, data: sheetData });
           } else {
-            // uploaderId должен быть userId (а НЕ artistId). Берём userId автора
-            // если он есть, иначе текущего админа.
             const uploaderId = track.artist?.userId || session.userId;
             await prisma.sheetMusic.create({
               data: {
                 trackId: params.id,
-                pdfUrl: sheetUrl,
+                pdfUrl: finalUrl,
                 title: track.title,
                 composerId: track.artistId,
                 uploaderId,
-                instrument: 'Не указан',
+                instrument: sheetData.instrument || 'Не указан',
+                ...(sheetData.difficulty ? { difficulty: sheetData.difficulty } : {}),
+                ...(sheetData.price !== undefined ? { price: sheetData.price } : {}),
+                ...(sheetData.isPublicDomain !== undefined ? { isPublicDomain: sheetData.isPublicDomain } : {}),
               },
             });
           }
-        } else if (sheetExists) {
+        } else if (sheetExists && sheetUrl === '') {
           await prisma.sheetMusic.delete({ where: { trackId: params.id } });
         }
       }

@@ -280,6 +280,11 @@ function EditTrackInline({
   const [audioUrl, setAudioUrl] = useState('');
   const [instrumentalUrl, setInstrumentalUrl] = useState('');
   const [sheetUrl, setSheetUrl] = useState('');
+  // Параметры нот
+  const [sheetInstrument, setSheetInstrument] = useState('Фортепиано');
+  const [sheetDifficulty, setSheetDifficulty] = useState('BEGINNER');
+  const [sheetPrice, setSheetPrice] = useState<string>('');
+  const [sheetIsPublicDomain, setSheetIsPublicDomain] = useState(false);
   const [era, setEra] = useState('');
   const [mood, setMood] = useState('');
   const [instruments, setInstruments] = useState('');
@@ -343,6 +348,10 @@ function EditTrackInline({
           setAudioUrl(d.audioUrl || '');
           setInstrumentalUrl(d.instrumentalUrl || d.minusAudioUrl || '');
           setSheetUrl(d.sheetUrl || '');
+          setSheetInstrument((d as any).sheetInstrument || 'Фортепиано');
+          setSheetDifficulty((d as any).sheetDifficulty || 'BEGINNER');
+          setSheetPrice((d as any).sheetPrice ? String((d as any).sheetPrice) : '');
+          setSheetIsPublicDomain(!!(d as any).sheetIsPublicDomain);
           setEra(d.era || '');
           setMood(d.mood || '');
           setInstruments(Array.isArray(d.instruments) ? d.instruments.join(', ') : (d.instruments || ''));
@@ -448,6 +457,10 @@ function EditTrackInline({
         audioUrl,
         instrumentalUrl,
         sheetUrl,
+        sheetInstrument,
+        sheetDifficulty,
+        sheetPrice,
+        sheetIsPublicDomain,
         era,
         mood,
         instruments: instruments
@@ -563,6 +576,55 @@ function EditTrackInline({
           onFile={onPdfFile}
           onClear={() => setSheetUrl('')}
         />
+
+        {/* Параметры нот — показываются когда PDF прикреплён */}
+        {sheetUrl && (
+          <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+            <div className="text-xs uppercase tracking-wider font-bold text-gray-700">Параметры нот</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Инструмент</label>
+                <input
+                  value={sheetInstrument}
+                  onChange={(e) => setSheetInstrument(e.target.value)}
+                  placeholder="Фортепиано, Скрипка, Хор…"
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Сложность нот</label>
+                <select
+                  value={sheetDifficulty}
+                  onChange={(e) => setSheetDifficulty(e.target.value)}
+                  className={inputCls}>
+                  <option value="BEGINNER">Начальный</option>
+                  <option value="INTERMEDIATE">Средний</option>
+                  <option value="ADVANCED">Продвинутый</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Цена нот (₽)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={sheetPrice}
+                  onChange={(e) => setSheetPrice(e.target.value)}
+                  placeholder="0 = бесплатно"
+                  className={inputCls}
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer sm:mt-7">
+                <input
+                  type="checkbox"
+                  checked={sheetIsPublicDomain}
+                  onChange={(e) => setSheetIsPublicDomain(e.target.checked)}
+                  className="accent-black"
+                />
+                Общественное достояние
+              </label>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ОСНОВНОЕ */}

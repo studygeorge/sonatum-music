@@ -74,6 +74,12 @@ export async function GET(
   // Накладываем pending поверх current — автор редактирует свою «черновую» версию
   if (pending) Object.assign(merged, pending);
 
+  // Поля нот — для UI редактора (instrument, difficulty, price, isPublicDomain)
+  merged.sheetInstrument = sheet?.instrument || null;
+  merged.sheetDifficulty = sheet?.difficulty || null;
+  merged.sheetPrice = sheet?.price ? Number(sheet.price) : null;
+  merged.sheetIsPublicDomain = !!sheet?.isPublicDomain;
+
   return NextResponse.json({ success: true, data: merged }, { headers: cors });
 }
 
@@ -166,12 +172,29 @@ export async function PATCH(
       }
     }
 
-    // Sheet (ноты) — диф против текущего pdfUrl
+    // Sheet (ноты) — диф против текущего pdfUrl + sheet-метаданные
+    const sheetExistsForDiff = await prisma.sheetMusic.findUnique({ where: { trackId: params.id } });
     if (body.sheetUrl !== undefined) {
-      const sheetExists = await prisma.sheetMusic.findUnique({ where: { trackId: params.id } });
-      const cur = sheetExists?.pdfUrl || null;
+      const cur = sheetExistsForDiff?.pdfUrl || null;
       const next = body.sheetUrl || null;
       if (cur !== next) pending.sheetUrl = next;
+    }
+    if (body.sheetInstrument !== undefined &&
+        (body.sheetInstrument || null) !== (sheetExistsForDiff?.instrument || null)) {
+      pending.sheetInstrument = body.sheetInstrument || null;
+    }
+    if (body.sheetDifficulty !== undefined &&
+        (body.sheetDifficulty || null) !== (sheetExistsForDiff?.difficulty || null)) {
+      pending.sheetDifficulty = body.sheetDifficulty || null;
+    }
+    if (body.sheetPrice !== undefined) {
+      const np = body.sheetPrice === '' || body.sheetPrice === null ? null : Number(body.sheetPrice);
+      const cp = sheetExistsForDiff?.price ? Number(sheetExistsForDiff.price) : null;
+      if (cp !== np) pending.sheetPrice = np;
+    }
+    if (body.sheetIsPublicDomain !== undefined &&
+        !!body.sheetIsPublicDomain !== !!sheetExistsForDiff?.isPublicDomain) {
+      pending.sheetIsPublicDomain = !!body.sheetIsPublicDomain;
     }
 
     // Записываем в metadata.pendingChanges, не трогая публичные поля
@@ -270,27 +293,49 @@ export async function PATCH(
     );
   }
 
-  if (body.sheetUrl !== undefined) {
+  // Sheet music: handle pdf URL и метаданные нот вместе
+  const sheetTouched =
+    body.sheetUrl !== undefined || body.sheetInstrument !== undefined ||
+    body.sheetDifficulty !== undefined || body.sheetPrice !== undefined ||
+    body.sheetIsPublicDomain !== undefined;
+
+  if (sheetTouched) {
     const sheetExists = await prisma.sheetMusic.findUnique({ where: { trackId: params.id } });
-    if (body.sheetUrl) {
+
+    // Полный URL: новый или текущий
+    const finalUrl =
+      body.sheetUrl !== undefined ? (body.sheetUrl || null) : (sheetExists?.pdfUrl || null);
+
+    if (finalUrl) {
+      const sheetData: any = { pdfUrl: finalUrl };
+      if (body.sheetInstrument !== undefined) sheetData.instrument = body.sheetInstrument || 'Не указан';
+      if (body.sheetDifficulty !== undefined && ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'].includes(body.sheetDifficulty)) {
+        sheetData.difficulty = body.sheetDifficulty;
+      }
+      if (body.sheetPrice !== undefined) {
+        sheetData.price = body.sheetPrice === '' || body.sheetPrice === null ? null : Number(body.sheetPrice);
+      }
+      if (body.sheetIsPublicDomain !== undefined) sheetData.isPublicDomain = !!body.sheetIsPublicDomain;
+
       if (sheetExists) {
-        await prisma.sheetMusic.update({
-          where: { trackId: params.id },
-          data: { pdfUrl: body.sheetUrl },
-        });
+        await prisma.sheetMusic.update({ where: { trackId: params.id }, data: sheetData });
       } else {
         await prisma.sheetMusic.create({
           data: {
             trackId: params.id,
-            pdfUrl: body.sheetUrl,
+            pdfUrl: finalUrl,
             title: track.title,
             composerId: track.artistId,
             uploaderId: session.userId,
-            instrument: 'Не указан',
+            instrument: sheetData.instrument || 'Не указан',
+            ...(sheetData.difficulty ? { difficulty: sheetData.difficulty } : {}),
+            ...(sheetData.price !== undefined ? { price: sheetData.price } : {}),
+            ...(sheetData.isPublicDomain !== undefined ? { isPublicDomain: sheetData.isPublicDomain } : {}),
           },
         });
       }
-    } else if (sheetExists) {
+    } else if (sheetExists && body.sheetUrl === '') {
+      // Пустой URL = удалить ноты
       await prisma.sheetMusic.delete({ where: { trackId: params.id } });
     }
   }
