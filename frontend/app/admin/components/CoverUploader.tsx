@@ -189,7 +189,7 @@ export default function CoverUploader({
                     <div className="space-y-2">
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          className="bg-black h-2 rounded-full transition-all duration-300"
                           style={{ width: `${progress}%` }}
                         />
                       </div>
@@ -198,14 +198,14 @@ export default function CoverUploader({
                   )}
 
                   {success && (
-                    <div className="flex items-center gap-2 text-green-600">
+                    <div className="flex items-center gap-2 text-black">
                       <CheckCircle className="w-5 h-5" />
                       <span className="text-sm font-medium">Обложка успешно загружена</span>
                     </div>
                   )}
 
                   {error && (
-                    <div className="flex items-center gap-2 text-red-600">
+                    <div className="flex items-center gap-2 text-black">
                       <AlertCircle className="w-5 h-5" />
                       <span className="text-sm">{error}</span>
                     </div>
@@ -214,7 +214,7 @@ export default function CoverUploader({
                   {!uploading && !success && (
                     <div className="mt-3 space-y-2">
                       {!canUpload && (
-                        <p className="text-sm text-orange-600">
+                        <p className="text-sm text-gray-600">
                           {!artistSlug || artistSlug === 'unknown' ? 'Выберите артиста' : 
                            !trackSlug || trackSlug === 'untitled' ? 'Введите название трека' : 
                            'Заполните все обязательные поля'}
@@ -223,7 +223,7 @@ export default function CoverUploader({
                       <button
                         onClick={handleUpload}
                         disabled={!canUpload}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Загрузить обложку
                       </button>
@@ -234,7 +234,7 @@ export default function CoverUploader({
 
               {!file && currentCoverUrl && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-green-900">Обложка загружена</p>
+                  <p className="text-sm font-medium text-gray-900">Обложка загружена</p>
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     className="px-3 py-1 text-sm bg-white border border-gray-300 text-gray-700 rounded hover:bg-gray-50"

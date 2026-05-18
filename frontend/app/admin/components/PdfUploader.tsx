@@ -67,8 +67,8 @@ export default function PdfUploader({
     <div className="space-y-4">
       {currentPdfUrl ? (
         <div className="relative p-6 border-2 border-gray-200 rounded-xl bg-gray-50 flex items-center gap-4">
-          <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <FileText className="w-6 h-6 text-red-600" />
+          <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <FileText className="w-6 h-6 text-black" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">
@@ -78,14 +78,14 @@ export default function PdfUploader({
               href={currentPdfUrl.startsWith('http') ? currentPdfUrl : `https://sonatum-music.ru${currentPdfUrl}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-blue-600 hover:text-blue-800"
+              className="text-xs text-gray-700 hover:text-black"
             >
               Смотреть файл
             </a>
           </div>
           <button
             onClick={() => onUploadComplete('', '')}
-            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="p-2 text-gray-400 hover:text-black hover:bg-gray-50 rounded-lg transition-colors"
             title="Удалить файл"
           >
             <X className="w-5 h-5" />
@@ -98,7 +98,7 @@ export default function PdfUploader({
             relative p-8 border-2 border-dashed rounded-xl cursor-pointer
             flex flex-col items-center justify-center text-center transition-colors
             ${isUploading ? 'bg-gray-50 border-gray-300' : 'hover:bg-gray-50 border-gray-300 hover:border-gray-400'}
-            ${error ? 'border-red-300 bg-red-50' : ''}
+            ${error ? 'border-black bg-gray-50' : ''}
           `}
         >
           <input
@@ -132,7 +132,7 @@ export default function PdfUploader({
       )}
       
       {error && (
-        <p className="text-sm text-red-600 font-medium">
+        <p className="text-sm text-black font-medium">
           {error}
         </p>
       )}

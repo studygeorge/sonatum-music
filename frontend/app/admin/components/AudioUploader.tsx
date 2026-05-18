@@ -202,8 +202,8 @@ export default function AudioUploader({
       {file && (
         <div className="bg-white rounded-xl border border-gray-300 p-4">
           <div className="flex items-start gap-4">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Music className="w-6 h-6 text-blue-600" />
+            <div className="p-3 bg-gray-100 rounded-lg">
+              <Music className="w-6 h-6 text-gray-700" />
             </div>
             
             <div className="flex-1 min-w-0">
@@ -230,7 +230,7 @@ export default function AudioUploader({
                 <div className="space-y-2">
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-black h-2 rounded-full transition-all duration-300"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
@@ -239,14 +239,14 @@ export default function AudioUploader({
               )}
 
               {success && (
-                <div className="flex items-center gap-2 text-green-600">
+                <div className="flex items-center gap-2 text-gray-900">
                   <CheckCircle className="w-5 h-5" />
                   <span className="text-sm font-medium">Файл успешно загружен</span>
                 </div>
               )}
 
               {error && (
-                <div className="flex items-center gap-2 text-red-600">
+                <div className="flex items-center gap-2 text-black">
                   <AlertCircle className="w-5 h-5" />
                   <span className="text-sm">{error}</span>
                 </div>
@@ -255,16 +255,16 @@ export default function AudioUploader({
               {!uploading && !success && (
                 <div className="mt-3 space-y-2">
                   {!canUpload && (
-                    <p className="text-sm text-orange-600">
-                      {!artistSlug || artistSlug === 'unknown' ? 'Выберите артиста' : 
-                       !trackSlug || trackSlug === 'untitled' ? 'Введите название трека' : 
+                    <p className="text-sm text-gray-600">
+                      {!artistSlug || artistSlug === 'unknown' ? 'Выберите артиста' :
+                       !trackSlug || trackSlug === 'untitled' ? 'Введите название трека' :
                        'Заполните все обязательные поля'}
                     </p>
                   )}
                   <button
                     onClick={handleUpload}
                     disabled={!canUpload}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Загрузить файл
                   </button>
@@ -276,16 +276,16 @@ export default function AudioUploader({
       )}
 
       {currentAudioUrl && !file && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+        <div className="bg-gray-50 border border-gray-300 rounded-xl p-4">
           <div className="flex items-center gap-3">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-green-900">Аудио файл загружен</p>
-              <p className="text-sm text-green-700">{currentAudioUrl}</p>
+            <CheckCircle className="w-5 h-5 text-black shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900">Аудио файл загружен</p>
+              <p className="text-xs text-gray-500 truncate" title={currentAudioUrl}>{currentAudioUrl}</p>
             </div>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-1 text-sm bg-white border border-green-300 text-green-700 rounded hover:bg-green-50"
+              className="shrink-0 px-3 py-1.5 text-sm bg-white border border-gray-300 text-gray-900 rounded hover:bg-gray-100"
             >
               Заменить
             </button>

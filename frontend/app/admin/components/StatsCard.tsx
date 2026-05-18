@@ -12,10 +12,10 @@ interface StatsCardProps {
 }
 
 const colorClasses = {
-  blue: 'bg-blue-500/10 text-blue-600',
-  green: 'bg-green-500/10 text-green-600',
-  purple: 'bg-purple-500/10 text-purple-600',
-  orange: 'bg-orange-500/10 text-orange-600',
+  blue: 'bg-gray-500/10 text-gray-700',
+  green: 'bg-gray-500/10 text-black',
+  purple: 'bg-gray-500/10 text-gray-700',
+  orange: 'bg-gray-500/10 text-gray-600',
 };
 
 export default function StatsCard({ title, value, icon: Icon, trend, color }: StatsCardProps) {
@@ -26,7 +26,7 @@ export default function StatsCard({ title, value, icon: Icon, trend, color }: St
           <Icon className="w-6 h-6" />
         </div>
         {trend && (
-          <span className={`text-sm font-medium ${trend.positive ? 'text-green-600' : 'text-red-600'}`}>
+          <span className={`text-sm font-medium ${trend.positive ? 'text-black' : 'text-black'}`}>
             {trend.value}
           </span>
         )}

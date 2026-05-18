@@ -217,8 +217,8 @@ export default function AvatarUploader({
       </div>
 
       {error && (
-        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="mt-3 p-3 bg-gray-50 border border-gray-300 rounded-lg">
+          <p className="text-sm text-black">{error}</p>
         </div>
       )}
     </div>
