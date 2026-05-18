@@ -73,6 +73,7 @@ export default function AuthorLayout({ children }: { children: React.ReactNode }
       setMe((prev) => (prev && prev.artist
         ? { ...prev, artist: { ...prev.artist, avatar: avatarUrl } }
         : prev));
+      window.dispatchEvent(new CustomEvent('sonatum:avatar-updated', { detail: { avatar: avatarUrl } }));
     } finally {
       setAvatarUploading(false);
     }
@@ -121,6 +122,19 @@ export default function AuthorLayout({ children }: { children: React.ReactNode }
   useEffect(() => {
     load();
   }, [load]);
+
+  // Слушаем событие обновления аватарки от любой страницы — синхронно
+  // меняем кружок в сайдбаре, без перезагрузки страницы
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {};
+      setMe((prev) => (prev && prev.artist
+        ? { ...prev, artist: { ...prev.artist, avatar: detail.avatar || null } }
+        : prev));
+    };
+    window.addEventListener('sonatum:avatar-updated', handler);
+    return () => window.removeEventListener('sonatum:avatar-updated', handler);
+  }, []);
 
   // loading skeleton встроен внутрь sidebar — layout не меняется
 

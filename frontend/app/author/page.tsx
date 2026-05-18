@@ -53,6 +53,8 @@ export default function AuthorOverviewPage() {
         body: JSON.stringify({ avatar: avatarUrl }),
       });
       await reload();
+      // Сообщаем layout-у и другим компонентам, что аватар сменился
+      window.dispatchEvent(new CustomEvent('sonatum:avatar-updated', { detail: { avatar: avatarUrl } }));
     } finally {
       setAvatarUploading(false);
     }
@@ -128,6 +130,7 @@ export default function AuthorOverviewPage() {
         body: JSON.stringify({ avatar: '' }),
       });
       await reload();
+      window.dispatchEvent(new CustomEvent('sonatum:avatar-updated', { detail: { avatar: null } }));
     } finally {
       setAvatarUploading(false);
     }
