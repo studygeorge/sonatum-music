@@ -3,15 +3,14 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { authStorage } from '@/app/lib/auth';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Music, 
-  Mic2, 
+import {
+  LayoutDashboard,
+  Users,
+  Music,
+  Mic2,
   FolderTree,
   Settings,
   LogOut,
-  Shield,
   FileText
 } from 'lucide-react';
 
@@ -36,17 +35,7 @@ export default function Sidebar() {
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-gray-900 text-white p-6 flex flex-col">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-          <Shield className="w-6 h-6" />
-        </div>
-        <div>
-          <h1 className="font-semibold text-lg">Сонатум</h1>
-          <p className="text-xs text-gray-400">Админ-панель</p>
-        </div>
-      </div>
-
-      <nav className="flex-1 space-y-2">
+      <nav className="flex-1 space-y-2 pt-2">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
