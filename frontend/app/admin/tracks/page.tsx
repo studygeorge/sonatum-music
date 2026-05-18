@@ -889,12 +889,45 @@ const FIELD_LABEL: Record<string, string> = {
   allowExclusive: "Эксклюзивная лицензия",
 };
 
-function fmtValue(v: any): string {
+// Переводы значений enum-ов
+const VALUE_LABELS: Record<string, Record<string, string>> = {
+  audioType: {
+    FULL: "Полная",
+    INSTRUMENTAL: "Минусовка",
+    BOTH: "Полная + минусовка",
+  },
+  difficulty: {
+    BEGINNER: "Начальный",
+    INTERMEDIATE: "Средний",
+    ADVANCED: "Продвинутый",
+  },
+  sheetDifficulty: {
+    BEGINNER: "Начальный",
+    INTERMEDIATE: "Средний",
+    ADVANCED: "Продвинутый",
+  },
+  contentType: {
+    ORIGINAL: "Оригинал",
+    COVER: "Кавер",
+    SHEET_ONLY: "Только ноты",
+  },
+};
+
+function fmtValue(v: any, field?: string): string {
   if (v === null || v === undefined || v === "") return "—";
   if (typeof v === "boolean") return v ? "да" : "нет";
   if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
   if (typeof v === "object") return JSON.stringify(v);
-  return String(v);
+  const s = String(v);
+  // Переводим enum-значения если есть словарь для этого поля
+  if (field && VALUE_LABELS[field] && VALUE_LABELS[field][s]) {
+    return VALUE_LABELS[field][s];
+  }
+  // Даты в ISO → русский формат
+  if (field === "releaseDate" && /^\d{4}-\d{2}-\d{2}/.test(s)) {
+    try { return new Date(s).toLocaleDateString("ru-RU"); } catch {}
+  }
+  return s;
 }
 
 function isFileField(k: string) {
@@ -951,7 +984,7 @@ function PendingChangesPanel({
                           открыть текущий
                         </a>
                       ) : (
-                        <span className="break-all">{fmtValue(oldVal)}</span>
+                        <span className="break-all">{fmtValue(oldVal, k)}</span>
                       )}
                     </td>
                     <td className="px-3 py-2 align-top text-gray-900">
@@ -969,7 +1002,7 @@ function PendingChangesPanel({
                           )}
                         </div>
                       ) : (
-                        <span className="break-all">{fmtValue(newVal)}</span>
+                        <span className="break-all">{fmtValue(newVal, k)}</span>
                       )}
                     </td>
                   </tr>
