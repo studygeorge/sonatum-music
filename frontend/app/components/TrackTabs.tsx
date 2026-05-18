@@ -24,6 +24,7 @@ interface Track {
 interface TrackTabsProps {
   track: Track;
   isPremium: boolean;
+  isSheetOnly?: boolean;
 }
 
 const TABS = ['О треке', 'Текст', 'Ноты'] as const;
@@ -55,8 +56,9 @@ function PremiumGate({ label }: { label: string }) {
   );
 }
 
-export default function TrackTabs({ track, isPremium }: TrackTabsProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('О треке');
+export default function TrackTabs({ track, isPremium, isSheetOnly = false }: TrackTabsProps) {
+  // Если только ноты — открываем вкладку '«Ноты»' сразу
+  const [activeTab, setActiveTab] = useState<Tab>(isSheetOnly ? 'Ноты' : 'О треке');
   const [isFullscreenViewerOpen, setIsFullscreenViewerOpen] = useState(false);
 
   const metaRows: { label: string; value: string | number | undefined }[] = [

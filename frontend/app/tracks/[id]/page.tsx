@@ -134,6 +134,12 @@ export default function TrackPage({ params }: { params: { id: string } }) {
   if (loading) return <div className="min-h-screen pt-32 flex justify-center items-center"><div className="w-8 h-8 rounded-full border-4 border-[var(--border)] border-t-[var(--accent)] animate-spin"></div></div>;
   if (!track) return <div className="min-h-screen pt-32 flex justify-center items-center text-[var(--text-secondary)]">Трек не найден</div>;
 
+  // Sheet-only: нет ни основного аудио, ни минусовки — только ноты в PDF
+  const hasAudio = !!(track.audioUrl && String(track.audioUrl).trim());
+  const hasInstrumental = !!(track.instrumentalUrl && String(track.instrumentalUrl).trim());
+  const isSheetOnly = !hasAudio && !hasInstrumental && !!track.sheetMusic?.pdfUrl;
+  const releaseTypeLabel = track.album?.title || (isSheetOnly ? 'Ноты' : 'Сингл');
+
   return (
     <main className="min-h-screen pt-0 md:pt-20 pb-32 px-4 md:px-8 max-w-[1500px] mx-auto flex flex-col xl:flex-row gap-6 animate-fadeInUp">
       
@@ -148,7 +154,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
            
            {/* Текстовая информация */}
            <div className="flex flex-col justify-center py-1 md:py-2 h-full min-w-0">
-              <span className="text-[11px] md:text-[13px] font-semibold text-[var(--text-secondary)] mb-0.5 md:mb-1 uppercase tracking-wider truncate w-full">{track.album?.title || 'Сингл'}</span>
+              <span className="text-[11px] md:text-[13px] font-semibold text-[var(--text-secondary)] mb-0.5 md:mb-1 uppercase tracking-wider truncate w-full">{releaseTypeLabel}</span>
               <h1 className="text-2xl sm:text-4xl md:text-7xl font-black tracking-tighter mb-1.5 md:mb-4 text-[#1c1c1e] leading-tight truncate w-full">{track.title}</h1>
               
               <div className="flex items-center gap-1.5 md:gap-3 mb-2 md:mb-8 text-[11px] md:text-[15px]">
@@ -171,12 +177,22 @@ export default function TrackPage({ params }: { params: { id: string } }) {
               
               {/* Кнопки управления ТОЛЬКО ДЛЯ ДЕСКТОПА (мобильные перенесены вниз) */}
               <div className="hidden md:flex flex-wrap items-center gap-3 mb-10">
-                <button
-                  className="px-8 py-3 rounded-full text-[15px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold"
-                  onClick={() => playTrack(track as any)}
-                >
-                   ▶ Слушать
-                </button>
+                {hasAudio ? (
+                  <button
+                    className="px-8 py-3 rounded-full text-[15px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold"
+                    onClick={() => playTrack(track as any)}
+                  >
+                     ▶ Слушать
+                  </button>
+                ) : isSheetOnly && track.sheetMusic?.pdfUrl ? (
+                  <a
+                    href={track.sheetMusic.pdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-8 py-3 rounded-full text-[15px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold">
+                    Открыть ноты PDF
+                  </a>
+                ) : null}
                 <button
                   onClick={toggleLibrary}
                   disabled={libraryBusy}
@@ -204,12 +220,22 @@ export default function TrackPage({ params }: { params: { id: string } }) {
         {/* Кнопки управления ТОЛЬКО ДЛЯ МОБИЛОК */}
         <div className="flex md:hidden flex-col gap-3 mb-8">
            <div className="flex gap-2 w-full">
-              <button
-                className="flex-1 py-3.5 rounded-2xl text-[15px] flex items-center justify-center gap-2 bg-[var(--text-primary)] text-white active:scale-95 transition-all shadow-sm font-bold"
-                onClick={() => playTrack(track as any)}
-              >
-                 ▶ Слушать
-              </button>
+              {hasAudio ? (
+                <button
+                  className="flex-1 py-3.5 rounded-2xl text-[15px] flex items-center justify-center gap-2 bg-[var(--text-primary)] text-white active:scale-95 transition-all shadow-sm font-bold"
+                  onClick={() => playTrack(track as any)}
+                >
+                   ▶ Слушать
+                </button>
+              ) : isSheetOnly && track.sheetMusic?.pdfUrl ? (
+                <a
+                  href={track.sheetMusic.pdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 py-3.5 rounded-2xl text-[15px] flex items-center justify-center gap-2 bg-[var(--text-primary)] text-white active:scale-95 transition-all shadow-sm font-bold">
+                  Открыть ноты PDF
+                </a>
+              ) : null}
               <button
                 onClick={toggleLibrary}
                 disabled={libraryBusy}
@@ -266,7 +292,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
         )}
 
         {/* TrackTabs: О треке / Текст / Ноты */}
-        <TrackTabs track={track} isPremium={isPremium} />
+        <TrackTabs track={track} isPremium={isPremium} isSheetOnly={isSheetOnly} />
         <div id="license-marketplace">
           <LicenseMarketplace trackId={track.id} trackTitle={track.title} />
         </div>
@@ -322,12 +348,22 @@ export default function TrackPage({ params }: { params: { id: string } }) {
             </Link>
             
             <div className="flex items-center gap-3 mt-6 mb-10">
-                <button 
-                  className="px-6 py-2.5 rounded-full text-[14px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold"
-                  onClick={() => playTrack(track as any)}  
-                >
-                   ▶ Слушать
-                </button>
+                {hasAudio ? (
+                  <button
+                    className="px-6 py-2.5 rounded-full text-[14px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold"
+                    onClick={() => playTrack(track as any)}
+                  >
+                     ▶ Слушать
+                  </button>
+                ) : isSheetOnly && track.sheetMusic?.pdfUrl ? (
+                  <a
+                    href={track.sheetMusic.pdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-6 py-2.5 rounded-full text-[14px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold">
+                    Открыть ноты PDF
+                  </a>
+                ) : null}
                 <button
                   onClick={toggleLibrary}
                   disabled={libraryBusy}
@@ -349,7 +385,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                 </button>
             </div>
             
-            <h3 className="text-2xl font-black mb-4 tracking-tight text-[#1c1c1e]">Сингл</h3>
+            <h3 className="text-2xl font-black mb-4 tracking-tight text-[#1c1c1e]">{releaseTypeLabel}</h3>
             <div className="flex items-center gap-4 mb-8">
                <div className="w-16 h-16 rounded-[1rem] bg-gray-200 overflow-hidden shadow-sm shrink-0 flex items-center justify-center text-lg font-bold text-gray-400">
                    {track.cover ? (
