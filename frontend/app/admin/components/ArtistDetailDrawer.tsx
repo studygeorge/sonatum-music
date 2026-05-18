@@ -12,21 +12,26 @@ interface Props {
 type StatusBadgeProps = { status?: string };
 function StatusBadge({ status }: StatusBadgeProps) {
   if (!status) return null;
+  // Монохромный стиль:
+  // - "положительные" → залитый чёрный с белым текстом
+  // - "ожидающие" → залитый средне-серый
+  // - "негативные" → outline (рамка)
+  // - "нейтральные" → светло-серый
   const styles: Record<string, string> = {
-    PUBLISHED: 'bg-green-100 text-green-800',
-    PENDING:   'bg-yellow-100 text-yellow-800',
-    REJECTED:  'bg-red-100 text-red-800',
-    DRAFT:     'bg-gray-100 text-gray-700',
-    ARCHIVED:  'bg-gray-200 text-gray-700',
-    ACTIVE:    'bg-green-100 text-green-800',
-    APPROVED:  'bg-green-100 text-green-800',
-    SUSPENDED: 'bg-red-100 text-red-800',
+    PUBLISHED: 'bg-black text-white',
+    APPROVED:  'bg-black text-white',
+    ACTIVE:    'bg-black text-white',
+    RESOLVED:  'bg-black text-white',
+    PENDING:   'bg-gray-700 text-white',
+    DRAFT:     'bg-gray-200 text-gray-900',
+    ARCHIVED:  'bg-gray-200 text-gray-500',
+    CANCELED:  'bg-gray-200 text-gray-500',
     DELETED:   'bg-gray-200 text-gray-500',
-    CANCELED:  'bg-gray-200 text-gray-700',
-    EXPIRED:   'bg-orange-100 text-orange-800',
-    RESOLVED:  'bg-blue-100 text-blue-800',
+    REJECTED:  'border border-black text-black bg-white',
+    SUSPENDED: 'border border-black text-black bg-white',
+    EXPIRED:   'border border-black text-black bg-white',
   };
-  const cls = styles[status] || 'bg-gray-100 text-gray-700';
+  const cls = styles[status] || 'bg-gray-200 text-gray-900';
   return <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${cls}`}>{status}</span>;
 }
 
@@ -89,7 +94,7 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
             <Loader className="animate-spin mr-2" size={20} /> Загрузка профиля...
           </div>
         )}
-        {error && <div className="p-6 text-red-600">{error}</div>}
+        {error && <div className="p-6 text-black border-l-4 border-black bg-gray-100 m-6 rounded">{error}</div>}
 
         {a && (
           <div className="p-6 space-y-7">
@@ -98,14 +103,14 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
               {a.avatar ? (
                 <img src={a.avatar} alt={a.name} className="w-24 h-24 rounded-2xl object-cover border border-gray-200" />
               ) : (
-                <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center text-3xl font-bold text-gray-400">
+                <div className="w-24 h-24 rounded-2xl bg-gray-100 border border-gray-200 flex items-center justify-center text-3xl font-bold text-gray-400">
                   {a.name?.[0] || '?'}
                 </div>
               )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-2xl font-bold text-gray-900">{a.name}</h3>
-                  {a.verified && <ShieldCheck size={20} className="text-blue-600" />}
+                  {a.verified && <ShieldCheck size={20} className="text-black" />}
                   <span className="text-xs text-gray-500">/{a.slug}</span>
                 </div>
                 <p className="text-sm text-gray-500 mt-0.5">
@@ -172,7 +177,7 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
                   {Object.entries(social).map(([k, v]) =>
                     v ? (
                       <a key={k} href={String(v)} target="_blank" rel="noreferrer"
-                         className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100">
+                         className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-900 hover:bg-gray-200 border border-gray-200">
                         {k} <ExternalLink size={10} />
                       </a>
                     ) : null
@@ -223,8 +228,8 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
             {u?.subscription && (
               <section>
                 <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Подписка</h4>
-                <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-3 text-sm">
-                  <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-700 font-bold text-xs">{u.subscription.tier}</span>
+                <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-3 text-sm border border-gray-200">
+                  <span className="px-2 py-0.5 rounded bg-black text-white font-bold text-xs">{u.subscription.tier}</span>
                   <StatusBadge status={u.subscription.status} />
                   <span className="text-gray-500">с {fmtDate(u.subscription.startDate)}</span>
                   {u.subscription.endDate && <span className="text-gray-500">до {fmtDate(u.subscription.endDate)}</span>}
@@ -239,29 +244,29 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
                 <TrendingUp size={14} /> Статистика
               </h4>
               <div className="grid grid-cols-4 gap-3 text-center">
-                <div className="bg-blue-50 rounded-lg p-3">
-                  <div className="text-2xl font-bold text-blue-700">{counts.tracks || 0}</div>
-                  <div className="text-xs text-gray-500">треков</div>
+                <div className="bg-black text-white rounded-lg p-3">
+                  <div className="text-2xl font-bold">{counts.tracks || 0}</div>
+                  <div className="text-xs text-gray-300">треков</div>
                 </div>
-                <div className="bg-green-50 rounded-lg p-3">
-                  <div className="text-2xl font-bold text-green-700">{totals.plays || 0}</div>
+                <div className="bg-gray-100 border border-gray-200 rounded-lg p-3">
+                  <div className="text-2xl font-bold text-gray-900">{totals.plays || 0}</div>
                   <div className="text-xs text-gray-500">прослушиваний</div>
                 </div>
-                <div className="bg-red-50 rounded-lg p-3">
-                  <div className="text-2xl font-bold text-red-700">{totals.likes || 0}</div>
+                <div className="bg-gray-100 border border-gray-200 rounded-lg p-3">
+                  <div className="text-2xl font-bold text-gray-900">{totals.likes || 0}</div>
                   <div className="text-xs text-gray-500">лайков</div>
                 </div>
-                <div className="bg-yellow-50 rounded-lg p-3">
-                  <div className="text-2xl font-bold text-yellow-700">{totals.purchases || 0}</div>
+                <div className="bg-gray-100 border border-gray-200 rounded-lg p-3">
+                  <div className="text-2xl font-bold text-gray-900">{totals.purchases || 0}</div>
                   <div className="text-xs text-gray-500">покупок</div>
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-5 gap-2 text-center text-xs">
-                <div className="bg-gray-100 rounded p-2"><b>{tbs.DRAFT || 0}</b><br /><span className="text-gray-500">DRAFT</span></div>
-                <div className="bg-yellow-100 rounded p-2"><b>{tbs.PENDING || 0}</b><br /><span className="text-gray-700">PENDING</span></div>
-                <div className="bg-green-100 rounded p-2"><b>{tbs.PUBLISHED || 0}</b><br /><span className="text-gray-700">PUBLISHED</span></div>
-                <div className="bg-red-100 rounded p-2"><b>{tbs.REJECTED || 0}</b><br /><span className="text-gray-700">REJECTED</span></div>
-                <div className="bg-gray-200 rounded p-2"><b>{tbs.ARCHIVED || 0}</b><br /><span className="text-gray-500">ARCHIVED</span></div>
+                <div className="bg-gray-100 rounded p-2 border border-gray-200"><b className="text-gray-900">{tbs.DRAFT || 0}</b><br /><span className="text-gray-500">DRAFT</span></div>
+                <div className="bg-gray-700 text-white rounded p-2"><b>{tbs.PENDING || 0}</b><br /><span className="text-gray-300">PENDING</span></div>
+                <div className="bg-black text-white rounded p-2"><b>{tbs.PUBLISHED || 0}</b><br /><span className="text-gray-300">PUBLISHED</span></div>
+                <div className="bg-white border border-black rounded p-2"><b className="text-gray-900">{tbs.REJECTED || 0}</b><br /><span className="text-gray-700">REJECTED</span></div>
+                <div className="bg-gray-200 rounded p-2"><b className="text-gray-900">{tbs.ARCHIVED || 0}</b><br /><span className="text-gray-500">ARCHIVED</span></div>
               </div>
             </section>
 
@@ -320,7 +325,7 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
                         <div className="text-xs text-gray-500">{s.instrument} · {s.difficulty} · {s.isPublicDomain ? 'Public Domain' : (s.price ? `${Number(s.price)} ₽` : 'free')}</div>
                       </div>
                       <StatusBadge status={s.verifyStatus} />
-                      {s.pdfUrl && <a href={s.pdfUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">PDF</a>}
+                      {s.pdfUrl && <a href={s.pdfUrl} target="_blank" rel="noreferrer" className="text-xs text-black underline hover:no-underline">PDF</a>}
                     </div>
                   ))}
                 </div>
@@ -368,13 +373,13 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
             {data.reports?.length > 0 && (
               <section>
                 <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <AlertTriangle size={14} className="text-red-600" /> Жалобы ({data.reports.length})
+                  <AlertTriangle size={14} className="text-black" /> Жалобы ({data.reports.length})
                 </h4>
                 <div className="space-y-2">
                   {data.reports.map((r: any) => (
-                    <div key={r.id} className="border border-red-200 bg-red-50/40 rounded-lg p-3 text-sm">
+                    <div key={r.id} className="border-2 border-black rounded-lg p-3 text-sm bg-white">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-red-900">{r.reason} · {r.targetType}</span>
+                        <span className="font-medium text-gray-900">{r.reason} · {r.targetType}</span>
                         <StatusBadge status={r.status} />
                       </div>
                       <div className="text-xs text-gray-600 mt-1">
@@ -406,7 +411,7 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
                         <tr key={tx.id} className="border-t border-gray-100">
                           <td className="px-3 py-2 text-xs text-gray-700">{tx.type}</td>
                           <td className="px-3 py-2 text-xs text-gray-700">{tx.description || '—'}</td>
-                          <td className={`px-3 py-2 text-right tabular-nums ${tx.type === 'WITHDRAWAL' ? 'text-red-700' : 'text-green-700'}`}>
+                          <td className="px-3 py-2 text-right tabular-nums text-gray-900 font-medium">
                             {tx.type === 'WITHDRAWAL' ? '−' : '+'}{Number(tx.amount).toLocaleString('ru-RU')} ₽
                           </td>
                           <td className="px-3 py-2 text-right text-xs text-gray-500">{fmtDate(tx.createdAt)}</td>
@@ -421,11 +426,11 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
             {/* QUICK ACTIONS */}
             <section className="border-t border-gray-200 pt-4 flex flex-wrap gap-2">
               <a href={`/artist/${a.slug}`} target="_blank" rel="noreferrer"
-                 className="inline-flex items-center gap-1 text-sm px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                 className="inline-flex items-center gap-1 text-sm px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800">
                 Открыть публичный профиль <ExternalLink size={14} />
               </a>
               <a href={`mailto:${u?.email}`}
-                 className="inline-flex items-center gap-1 text-sm px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">
+                 className="inline-flex items-center gap-1 text-sm px-4 py-2 rounded-lg bg-gray-100 text-gray-900 hover:bg-gray-200 border border-gray-200">
                 <Mail size={14} /> Написать на {u?.email}
               </a>
             </section>

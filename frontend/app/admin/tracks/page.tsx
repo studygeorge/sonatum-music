@@ -471,7 +471,7 @@ export default function TracksPage() {
               </span>
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors text-sm"
               >
                 <Trash2 className="w-4 h-4" />
                 Удалить выбранные
@@ -555,13 +555,13 @@ export default function TracksPage() {
                           <button
                             type="button"
                             onClick={() => setArtistDrawerId(track.artist.id)}
-                            className="hover:underline hover:text-blue-700 font-medium text-blue-600 transition-colors"
+                            className="font-medium text-gray-900 underline decoration-gray-400 hover:decoration-black underline-offset-2 transition-colors"
                             title="Открыть профиль артиста"
                           >
                             {track.artist.name}
                           </button>
                           {track.artist.verified && (
-                            <CheckCircle className="w-4 h-4 text-blue-500" />
+                            <CheckCircle className="w-4 h-4 text-black" />
                           )}
                           {track.artist.user?.email && (
                             <span className="text-xs text-gray-400">· {track.artist.user.email}</span>
@@ -594,7 +594,7 @@ export default function TracksPage() {
 
                         <button
                           onClick={() => handleDeleteSingle(track.id)}
-                          className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-2 text-gray-700 hover:text-black hover:bg-gray-100 rounded-lg transition-colors"
                           title="Удалить"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -684,14 +684,14 @@ export default function TracksPage() {
                       <div className="flex gap-3">
                         <button
                           onClick={() => handleApprove(track.id)}
-                          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors text-sm"
+                          className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors text-sm"
                         >
                           <CheckCircle className="w-4 h-4" />
                           Одобрить
                         </button>
                         <button
                           onClick={() => openRejectModal(track)}
-                          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors text-sm"
+                          className="flex items-center gap-2 px-4 py-2 bg-white text-black border-2 border-black rounded-xl hover:bg-gray-100 transition-colors text-sm"
                         >
                           <XCircle className="w-4 h-4" />
                           Отклонить
