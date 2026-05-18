@@ -9,8 +9,70 @@ interface Props {
   onClose: () => void;
 }
 
-type StatusBadgeProps = { status?: string };
-function StatusBadge({ status }: StatusBadgeProps) {
+// Словари переводов и стилей
+const STATUS_LABEL: Record<string, string> = {
+  PUBLISHED: 'Опубликован',
+  APPROVED:  'Одобрено',
+  ACTIVE:    'Активен',
+  RESOLVED:  'Решено',
+  PENDING:   'На модерации',
+  DRAFT:     'Черновик',
+  ARCHIVED:  'В архиве',
+  CANCELED:  'Отменён',
+  DELETED:   'Удалён',
+  REJECTED:  'Отклонён',
+  SUSPENDED: 'Заблокирован',
+  EXPIRED:   'Истёк',
+  PAST_DUE:  'Просрочен',
+};
+
+const TIER_LABEL: Record<string, string> = {
+  FREE:    'Бесплатно',
+  PREMIUM: 'Премиум',
+  STUDENT: 'Студент',
+  B2B:     'B2B',
+};
+
+const TX_TYPE_LABEL: Record<string, string> = {
+  EARNING:    'Доход',
+  WITHDRAWAL: 'Вывод',
+  PURCHASE:   'Покупка',
+};
+
+const REPORT_TARGET_LABEL: Record<string, string> = {
+  TRACK:   'трек',
+  COMMENT: 'комментарий',
+  USER:    'пользователь',
+};
+
+const REPORT_REASON_LABEL: Record<string, string> = {
+  COPYRIGHT:     'Авторские права',
+  INAPPROPRIATE: 'Неприемлемый контент',
+  METADATA:      'Неверные метаданные',
+  TECHNICAL:     'Технические проблемы',
+  OTHER:         'Другое',
+};
+
+const B2B_TYPE_LABEL: Record<string, string> = {
+  LICENSE:  'Лицензия',
+  ACADEMIC: 'Образование',
+  OTHER:    'Другое',
+};
+
+const AUDIO_TYPE_LABEL: Record<string, string> = {
+  FULL:         'Полная',
+  INSTRUMENTAL: 'Минусовка',
+  BOTH:         'Полная + минусовка',
+};
+
+const VERIFY_LABEL: Record<string, string> = {
+  PENDING:  'На проверке',
+  APPROVED: 'Одобрено',
+  REJECTED: 'Отклонено',
+};
+
+type StatusBadgeProps = { status?: string; labels?: Record<string, string> };
+function StatusBadge({ status, labels }: StatusBadgeProps) {
   if (!status) return null;
   // Монохромный стиль:
   // - "положительные" → залитый чёрный с белым текстом
@@ -30,9 +92,12 @@ function StatusBadge({ status }: StatusBadgeProps) {
     REJECTED:  'border border-black text-black bg-white',
     SUSPENDED: 'border border-black text-black bg-white',
     EXPIRED:   'border border-black text-black bg-white',
+    PAST_DUE:  'border border-black text-black bg-white',
   };
   const cls = styles[status] || 'bg-gray-200 text-gray-900';
-  return <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${cls}`}>{status}</span>;
+  const dict = labels || STATUS_LABEL;
+  const label = dict[status] || status;
+  return <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${cls}`}>{label}</span>;
 }
 
 function fmtDate(s?: string | Date | null) {
@@ -131,44 +196,38 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
               </div>
             </section>
 
-            {/* CONTACTS */}
+            {/* CONTACTS — только то что реально нужно для связи */}
             <section>
               <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Контакты</h4>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <div className="text-xs text-gray-500">Email</div>
-                  <div className="font-medium text-gray-900 break-all">
-                    <a href={`mailto:${u?.email}`} className="hover:underline">{u?.email || '—'}</a>
+                <div className="bg-gray-50 rounded-lg p-3 col-span-2 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs text-gray-500">Email</div>
+                    <a href={`mailto:${u?.email}`} className="font-medium text-gray-900 break-all hover:underline">{u?.email || '—'}</a>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <StatusBadge status={u?.status} />
+                    {u?.emailVerified && <span className="text-xs text-gray-500">подтверждён</span>}
                   </div>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <div className="text-xs text-gray-500">Логин</div>
-                  <div className="font-medium text-gray-900">{u?.username || '—'}</div>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <div className="text-xs text-gray-500">ФИО</div>
-                  <div className="font-medium text-gray-900">{[u?.firstName, u?.lastName].filter(Boolean).join(' ') || '—'}</div>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <div className="text-xs text-gray-500">Псевдоним</div>
-                  <div className="font-medium text-gray-900">{u?.nickname || '—'}</div>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <div className="text-xs text-gray-500">Статус аккаунта</div>
-                  <div className="font-medium"><StatusBadge status={u?.status} /></div>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <div className="text-xs text-gray-500">Email подтверждён</div>
-                  <div className="font-medium text-gray-900">{u?.emailVerified ? fmtDate(u.emailVerified) : '—'}</div>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <div className="text-xs text-gray-500">Последний вход</div>
-                  <div className="font-medium text-gray-900">{fmtDate(u?.lastLoginAt)}</div>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <div className="text-xs text-gray-500">Баланс</div>
-                  <div className="font-medium text-gray-900">{Number(u?.balance || 0).toLocaleString('ru-RU')} ₽</div>
-                </div>
+                {[u?.firstName, u?.lastName].filter(Boolean).length > 0 && (
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-xs text-gray-500">ФИО</div>
+                    <div className="font-medium text-gray-900">{[u?.firstName, u?.lastName].filter(Boolean).join(' ')}</div>
+                  </div>
+                )}
+                {u?.nickname && (
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-xs text-gray-500">Псевдоним</div>
+                    <div className="font-medium text-gray-900">{u.nickname}</div>
+                  </div>
+                )}
+                {u?.lastLoginAt && (
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-xs text-gray-500">Последний вход</div>
+                    <div className="font-medium text-gray-900">{fmtDate(u.lastLoginAt)}</div>
+                  </div>
+                )}
               </div>
 
               {/* Social links */}
@@ -228,8 +287,10 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
             {u?.subscription && (
               <section>
                 <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3">Подписка</h4>
-                <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-3 text-sm border border-gray-200">
-                  <span className="px-2 py-0.5 rounded bg-black text-white font-bold text-xs">{u.subscription.tier}</span>
+                <div className="bg-gray-50 rounded-lg p-3 flex items-center gap-3 text-sm border border-gray-200 flex-wrap">
+                  <span className="px-2 py-0.5 rounded bg-black text-white font-bold text-xs">
+                    {TIER_LABEL[u.subscription.tier] || u.subscription.tier}
+                  </span>
                   <StatusBadge status={u.subscription.status} />
                   <span className="text-gray-500">с {fmtDate(u.subscription.startDate)}</span>
                   {u.subscription.endDate && <span className="text-gray-500">до {fmtDate(u.subscription.endDate)}</span>}
@@ -238,36 +299,39 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
               </section>
             )}
 
-            {/* STATS */}
+            {/* STATS — одна сводка без дублей */}
             <section>
               <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
                 <TrendingUp size={14} /> Статистика
               </h4>
-              <div className="grid grid-cols-4 gap-3 text-center">
+              {/* Главные показатели — всего треков, прослушиваний, продаж */}
+              <div className="grid grid-cols-3 gap-3 text-center">
                 <div className="bg-black text-white rounded-lg p-3">
                   <div className="text-2xl font-bold">{counts.tracks || 0}</div>
-                  <div className="text-xs text-gray-300">треков</div>
+                  <div className="text-xs text-gray-300">всего треков</div>
                 </div>
                 <div className="bg-gray-100 border border-gray-200 rounded-lg p-3">
                   <div className="text-2xl font-bold text-gray-900">{totals.plays || 0}</div>
                   <div className="text-xs text-gray-500">прослушиваний</div>
                 </div>
                 <div className="bg-gray-100 border border-gray-200 rounded-lg p-3">
-                  <div className="text-2xl font-bold text-gray-900">{totals.likes || 0}</div>
-                  <div className="text-xs text-gray-500">лайков</div>
-                </div>
-                <div className="bg-gray-100 border border-gray-200 rounded-lg p-3">
                   <div className="text-2xl font-bold text-gray-900">{totals.purchases || 0}</div>
-                  <div className="text-xs text-gray-500">покупок</div>
+                  <div className="text-xs text-gray-500">продаж</div>
                 </div>
               </div>
-              <div className="mt-3 grid grid-cols-5 gap-2 text-center text-xs">
-                <div className="bg-gray-100 rounded p-2 border border-gray-200"><b className="text-gray-900">{tbs.DRAFT || 0}</b><br /><span className="text-gray-500">DRAFT</span></div>
-                <div className="bg-gray-700 text-white rounded p-2"><b>{tbs.PENDING || 0}</b><br /><span className="text-gray-300">PENDING</span></div>
-                <div className="bg-black text-white rounded p-2"><b>{tbs.PUBLISHED || 0}</b><br /><span className="text-gray-300">PUBLISHED</span></div>
-                <div className="bg-white border border-black rounded p-2"><b className="text-gray-900">{tbs.REJECTED || 0}</b><br /><span className="text-gray-700">REJECTED</span></div>
-                <div className="bg-gray-200 rounded p-2"><b className="text-gray-900">{tbs.ARCHIVED || 0}</b><br /><span className="text-gray-500">ARCHIVED</span></div>
-              </div>
+              {/* Разбивка треков по статусам — показываем только ненулевые */}
+              {(['PENDING', 'PUBLISHED', 'REJECTED', 'DRAFT', 'ARCHIVED'] as const).some((s) => tbs[s]) && (
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  {(['PENDING', 'PUBLISHED', 'REJECTED', 'DRAFT', 'ARCHIVED'] as const).map((s) =>
+                    tbs[s] ? (
+                      <span key={s} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-gray-100 border border-gray-200">
+                        <span className="font-bold text-gray-900">{tbs[s]}</span>
+                        <span className="text-gray-600">{STATUS_LABEL[s] || s}</span>
+                      </span>
+                    ) : null
+                  )}
+                </div>
+              )}
             </section>
 
             {/* TRACKS */}
@@ -281,11 +345,11 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
                     <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
                       <tr>
                         <th className="text-left px-3 py-2">Название</th>
-                        <th className="text-left px-3 py-2">Тип</th>
+                        <th className="text-left px-3 py-2">Версия</th>
                         <th className="text-left px-3 py-2">Статус</th>
                         <th className="text-right px-3 py-2">Длит.</th>
                         <th className="text-right px-3 py-2">Цена</th>
-                        <th className="text-right px-3 py-2">▶ / ❤️</th>
+                        <th className="text-right px-3 py-2">Прослуш. / Лайки</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -295,7 +359,7 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
                             <a href={`/tracks/${t.slug || t.id}`} target="_blank" rel="noreferrer" className="text-gray-900 hover:underline">{t.title}</a>
                             <div className="text-xs text-gray-400">{fmtDate(t.createdAt)}</div>
                           </td>
-                          <td className="px-3 py-2 text-xs text-gray-600">{t.audioType || 'FULL'}</td>
+                          <td className="px-3 py-2 text-xs text-gray-600">{AUDIO_TYPE_LABEL[t.audioType] || 'Полная'}</td>
                           <td className="px-3 py-2"><StatusBadge status={t.status} /></td>
                           <td className="px-3 py-2 text-right tabular-nums">{fmtDuration(t.duration)}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{t.price ? `${Number(t.price)} ₽` : t.isFree ? 'бесплатно' : '—'}</td>
@@ -322,9 +386,11 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
                       <FileText size={18} className="text-gray-400" />
                       <div className="flex-1">
                         <div className="font-medium text-gray-900">{s.title}</div>
-                        <div className="text-xs text-gray-500">{s.instrument} · {s.difficulty} · {s.isPublicDomain ? 'Public Domain' : (s.price ? `${Number(s.price)} ₽` : 'free')}</div>
+                        <div className="text-xs text-gray-500">
+                          {s.instrument} · {({BEGINNER:'начальный', INTERMEDIATE:'средний', ADVANCED:'продвинутый'} as any)[s.difficulty] || s.difficulty} · {s.isPublicDomain ? 'общественное достояние' : (s.price ? `${Number(s.price)} ₽` : 'бесплатно')}
+                        </div>
                       </div>
-                      <StatusBadge status={s.verifyStatus} />
+                      <StatusBadge status={s.verifyStatus} labels={VERIFY_LABEL} />
                       {s.pdfUrl && <a href={s.pdfUrl} target="_blank" rel="noreferrer" className="text-xs text-black underline hover:no-underline">PDF</a>}
                     </div>
                   ))}
@@ -355,7 +421,7 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
                   {data.b2bRequests.map((r: any) => (
                     <div key={r.id} className="border border-gray-200 rounded-lg p-3 text-sm">
                       <div className="flex items-center justify-between">
-                        <div className="font-medium">{r.companyName || '—'} <span className="text-xs text-gray-500">{r.requestType}</span></div>
+                        <div className="font-medium">{r.companyName || '—'} <span className="text-xs text-gray-500">· {B2B_TYPE_LABEL[r.requestType] || r.requestType}</span></div>
                         <StatusBadge status={r.status} />
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
@@ -379,7 +445,11 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
                   {data.reports.map((r: any) => (
                     <div key={r.id} className="border-2 border-black rounded-lg p-3 text-sm bg-white">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-900">{r.reason} · {r.targetType}</span>
+                        <span className="font-medium text-gray-900">
+                          {REPORT_REASON_LABEL[r.reason] || r.reason}
+                          {' · '}
+                          <span className="text-gray-600 font-normal">{REPORT_TARGET_LABEL[r.targetType] || r.targetType}</span>
+                        </span>
                         <StatusBadge status={r.status} />
                       </div>
                       <div className="text-xs text-gray-600 mt-1">
@@ -409,7 +479,7 @@ export default function ArtistDetailDrawer({ artistId, onClose }: Props) {
                     <tbody>
                       {data.transactions.map((tx: any) => (
                         <tr key={tx.id} className="border-t border-gray-100">
-                          <td className="px-3 py-2 text-xs text-gray-700">{tx.type}</td>
+                          <td className="px-3 py-2 text-xs text-gray-700">{TX_TYPE_LABEL[tx.type] || tx.type}</td>
                           <td className="px-3 py-2 text-xs text-gray-700">{tx.description || '—'}</td>
                           <td className="px-3 py-2 text-right tabular-nums text-gray-900 font-medium">
                             {tx.type === 'WITHDRAWAL' ? '−' : '+'}{Number(tx.amount).toLocaleString('ru-RU')} ₽
