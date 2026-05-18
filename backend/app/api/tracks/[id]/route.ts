@@ -96,10 +96,10 @@ export async function GET(
       }
     }
 
-    await prisma.track.update({
-      where: { id: track.id },
-      data: { playCount: { increment: 1 } }
-    });
+    // Раньше тут увеличивали playCount на каждом GET — просмотр страницы
+    // не равен реальному прослушиванию. Инкремент перенесён на момент
+    // реального проигрывания (player → POST /api/tracks/[id]/activity или
+    // существующий /api/likes-event), здесь только читаем.
 
     const similarTracks = await prisma.track.findMany({
       where: {

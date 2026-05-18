@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import TrackTabs from '@/components/TrackTabs';
 import CommentsSection from '@/components/CommentsSection';
 import LicenseMarketplace from './LicenseMarketplace';
+import { Plus, Check, Flag } from 'lucide-react';
 
 export default function TrackPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -19,6 +20,26 @@ export default function TrackPage({ params }: { params: { id: string } }) {
   const [user, setUser] = useState<any>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [lyricsExpanded, setLyricsExpanded] = useState(false);
+
+  // Состояние "добавлен в библиотеку" (бывшая «лайк»-логика, теперь UI '+')
+  const [inLibrary, setInLibrary] = useState(false);
+  const [libraryBusy, setLibraryBusy] = useState(false);
+
+  const toggleLibrary = async () => {
+    if (libraryBusy) return;
+    setLibraryBusy(true);
+    try {
+      if (inLibrary) {
+        const res = await api.unlikeTrack(params.id);
+        if (res.success) setInLibrary(false);
+      } else {
+        const res = await api.likeTrack(params.id);
+        if (res.success) setInLibrary(true);
+      }
+    } finally {
+      setLibraryBusy(false);
+    }
+  };
   
   // Interactive variables — report lives in CommentsSection now
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -48,6 +69,17 @@ export default function TrackPage({ params }: { params: { id: string } }) {
           if (trackRes.data.similarTracks) {
             setSimilarTracks(trackRes.data.similarTracks.slice(0, 4));
           }
+          // Проверяем, в библиотеке ли уже трек (бывший liked)
+          try {
+            const token = localStorage.getItem('token');
+            if (token) {
+              const r = await fetch(`/api/likes/${trackRes.data.track.id}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              const j = await r.json();
+              setInLibrary(!!j?.liked);
+            }
+          } catch {}
         } else {
           // Track not found — show nothing, don't use fake data
           setTrack(null);
@@ -136,24 +168,31 @@ export default function TrackPage({ params }: { params: { id: string } }) {
               
               {/* Кнопки управления ТОЛЬКО ДЛЯ ДЕСКТОПА (мобильные перенесены вниз) */}
               <div className="hidden md:flex flex-wrap items-center gap-3 mb-10">
-                <button 
-                  className="px-8 py-3 rounded-full text-[15px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold" 
+                <button
+                  className="px-8 py-3 rounded-full text-[15px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold"
                   onClick={() => playTrack(track as any)}
                 >
                    ▶ Слушать
                 </button>
-                <button className="h-12 px-5 rounded-full bg-[#e8e6e1] text-[#1c1c1e] hover:bg-[#dfdcd5] transition-colors flex items-center justify-center gap-2 font-medium">
-                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                   {track.playCount?.toLocaleString('ru-RU') || '27 018'}
-                </button>
-                <button className="w-12 h-12 rounded-full bg-[#e8e6e1] text-[#1c1c1e] hover:bg-[#dfdcd5] transition-colors flex items-center justify-center font-bold font-serif">
-                   P
-                </button>
-                <button 
-                  onClick={() => openReportModal('TRACK', track.id)}
-                  className="w-12 h-12 rounded-full bg-[#e8e6e1] text-[#1c1c1e] hover:bg-[#dfdcd5] transition-colors flex items-center justify-center font-bold"
+                <button
+                  onClick={toggleLibrary}
+                  disabled={libraryBusy}
+                  className={`h-12 px-5 rounded-full transition-colors flex items-center justify-center gap-2 font-medium border ${
+                    inLibrary
+                      ? 'bg-[var(--text-primary)] text-white border-transparent hover:opacity-90'
+                      : 'bg-[#e8e6e1] text-[#1c1c1e] hover:bg-[#dfdcd5] border-transparent'
+                  } disabled:opacity-50`}
+                  title={inLibrary ? 'Убрать из библиотеки' : 'Добавить в библиотеку'}
                 >
-                   ...
+                  {inLibrary ? <Check size={18} /> : <Plus size={18} />}
+                  {inLibrary ? 'В библиотеке' : 'Добавить'}
+                </button>
+                <button
+                  onClick={() => openReportModal('TRACK', track.id)}
+                  className="w-12 h-12 rounded-full bg-[#e8e6e1] text-[#1c1c1e] hover:bg-[#dfdcd5] transition-colors flex items-center justify-center"
+                  title="Пожаловаться"
+                >
+                  <Flag size={18} />
                 </button>
               </div>
            </div>
@@ -162,23 +201,28 @@ export default function TrackPage({ params }: { params: { id: string } }) {
         {/* Кнопки управления ТОЛЬКО ДЛЯ МОБИЛОК */}
         <div className="flex md:hidden flex-col gap-3 mb-8">
            <div className="flex gap-2 w-full">
-              <button 
-                className="flex-1 py-3.5 rounded-2xl text-[15px] flex items-center justify-center gap-2 bg-[var(--text-primary)] text-white active:scale-95 transition-all shadow-sm font-bold" 
+              <button
+                className="flex-1 py-3.5 rounded-2xl text-[15px] flex items-center justify-center gap-2 bg-[var(--text-primary)] text-white active:scale-95 transition-all shadow-sm font-bold"
                 onClick={() => playTrack(track as any)}
               >
                  ▶ Слушать
               </button>
-              <button 
-                onClick={() => openReportModal('TRACK', track.id)}
-                className="w-[52px] h-[52px] rounded-2xl bg-[#e8e6e1] text-[#1c1c1e] active:scale-95 transition-all flex items-center justify-center font-bold shrink-0"
+              <button
+                onClick={toggleLibrary}
+                disabled={libraryBusy}
+                className={`w-[52px] h-[52px] rounded-2xl active:scale-95 transition-all flex items-center justify-center shrink-0 disabled:opacity-50 ${
+                  inLibrary ? 'bg-[var(--text-primary)] text-white' : 'bg-[#e8e6e1] text-[#1c1c1e]'
+                }`}
+                title={inLibrary ? 'Убрать из библиотеки' : 'Добавить в библиотеку'}
               >
-                 ...
+                {inLibrary ? <Check size={22} /> : <Plus size={22} />}
               </button>
-           </div>
-           <div className="flex items-center gap-2 w-full">
-              <button className="flex-1 py-2.5 rounded-xl text-[13px] bg-gray-100 text-[#1c1c1e] active:scale-95 transition-all flex items-center justify-center gap-1.5 font-medium border border-gray-200">
-                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                 {track.playCount?.toLocaleString('ru-RU') || '27k'}
+              <button
+                onClick={() => openReportModal('TRACK', track.id)}
+                className="w-[52px] h-[52px] rounded-2xl bg-[#e8e6e1] text-[#1c1c1e] active:scale-95 transition-all flex items-center justify-center shrink-0"
+                title="Пожаловаться"
+              >
+                <Flag size={20} />
               </button>
            </div>
         </div>
@@ -284,14 +328,24 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                 >
                    ▶ Слушать
                 </button>
-                <button className="w-10 h-10 rounded-full bg-black/5 text-[#1c1c1e] hover:bg-black/10 transition-colors flex items-center justify-center">
-                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                </button>
-                <button 
-                  onClick={() => openReportModal('TRACK', track.id)}
-                  className="w-10 h-10 rounded-full bg-black/5 text-[#1c1c1e] hover:bg-black/10 transition-colors flex items-center justify-center font-bold"
+                <button
+                  onClick={toggleLibrary}
+                  disabled={libraryBusy}
+                  className={`w-10 h-10 rounded-full transition-colors flex items-center justify-center disabled:opacity-50 ${
+                    inLibrary
+                      ? 'bg-[var(--text-primary)] text-white hover:opacity-90'
+                      : 'bg-black/5 text-[#1c1c1e] hover:bg-black/10'
+                  }`}
+                  title={inLibrary ? 'Убрать из библиотеки' : 'Добавить в библиотеку'}
                 >
-                   ...
+                  {inLibrary ? <Check size={18} /> : <Plus size={18} />}
+                </button>
+                <button
+                  onClick={() => openReportModal('TRACK', track.id)}
+                  className="w-10 h-10 rounded-full bg-black/5 text-[#1c1c1e] hover:bg-black/10 transition-colors flex items-center justify-center"
+                  title="Пожаловаться"
+                >
+                  <Flag size={18} />
                 </button>
             </div>
             
