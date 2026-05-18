@@ -158,9 +158,13 @@ function AuthorTracksPageInner() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold truncate">{t.title}</span>
-                      <span className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ${s.cls}`}>
-                        {s.label}
-                      </span>
+                      {/* Бейдж показываем только для не-опубликованных — для published
+                         это шум, и так понятно что он живёт в каталоге. */}
+                      {t.status !== 'PUBLISHED' && (
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ${s.cls}`}>
+                          {s.label}
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-[var(--text-secondary)] mt-0.5 flex items-center gap-3 flex-wrap">
                       <span>{fmtDuration(t.duration)}</span>
