@@ -226,18 +226,6 @@ export default function CreateTrackModal({
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Длительность (секунды)
-              </label>
-              <input
-                type="number"
-                value={formData.duration}
-                readOnly
-                className="w-full px-4 py-2 rounded-xl border border-gray-300 bg-gray-50 outline-none"
-              />
-              <p className="text-xs text-gray-500 mt-1">Заполняется автоматически</p>
-            </div>
           </div>
 
           {/* Колонка 2 */}
