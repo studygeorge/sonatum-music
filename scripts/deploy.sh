@@ -5,6 +5,12 @@ set -euo pipefail
 
 cd /opt/sonatum
 
+# 0) Ensure bind-mounted data dirs are writable by the container user (uid 1001)
+#    Container runs as uid=1001 (nextjs); host dirs inherit root by default.
+#    Without this, /api/upload/* fails with EACCES on first write to a new subdir.
+chown -R 1001:1001 /opt/sonatum/data/audio /opt/sonatum/data/images \
+                   /opt/sonatum/data/sheets /opt/sonatum/data/uploads 2>/dev/null || true
+
 # 1) Build new images (no traffic interruption — old containers keep serving)
 docker compose build --pull
 
