@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { authStorage } from '@/app/lib/auth';
+import AvatarCropModal from '@/app/author/components/AvatarCropModal';
 
 export default function AuthorOverviewPage() {
   const [me, setMe] = useState<any>(null);
@@ -23,18 +24,26 @@ export default function AuthorOverviewPage() {
     reload().finally(() => setLoading(false));
   }, []);
 
-  const uploadAvatar = async (file: File | null) => {
-    if (!file || !me?.artist) return;
+  // Файл сначала открываем в кропалке, и только после Готово отправляем
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  const handleSelectFile = (f: File | null) => {
+    if (f) setPendingFile(f);
+  };
+
+  const uploadCroppedAvatar = async (blob: Blob) => {
+    if (!me?.artist) return;
+    setPendingFile(null);
     setAvatarUploading(true);
     try {
       const fd = new FormData();
+      const file = new File([blob], 'avatar.png', { type: 'image/png' });
       fd.append('file', file);
       fd.append('artistSlug', me.artist.slug || me.artist.id || 'artist');
       const ur = await fetch('/api/upload/avatar', { method: 'POST', body: fd });
       const uj = await ur.json();
       const avatarUrl = uj?.data?.avatarUrl || uj?.avatarUrl || uj?.url;
       if (!uj.success || !avatarUrl) return;
-      // Записываем в Artist.avatar через свой эндпоинт
       await fetch('/api/author/me', {
         method: 'PATCH',
         headers: {
@@ -46,6 +55,63 @@ export default function AuthorOverviewPage() {
       await reload();
     } finally {
       setAvatarUploading(false);
+    }
+  };
+
+  // Редактирование основных полей (имя/регион/город/bio)
+  const [editing, setEditing] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [form, setForm] = useState({ name: '', region: '', city: '', bio: '' });
+  const [regions, setRegions] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    fetch('/api/map/regions')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success && Array.isArray(j.data)) {
+          setRegions(
+            j.data
+              .map((r: any) => ({ id: r.id, name: r.name }))
+              .sort((a: any, b: any) => a.name.localeCompare(b.name, 'ru'))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const openEdit = () => {
+    if (!me?.artist) return;
+    setForm({
+      name: me.artist.name || '',
+      region: me.artist.region || '',
+      city: me.artist.city || '',
+      bio: me.artist.bio || '',
+    });
+    setEditing(true);
+  };
+
+  const saveProfile = async () => {
+    if (!me?.artist) return;
+    setSavingProfile(true);
+    try {
+      await fetch('/api/author/me', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authStorage.getToken() || ''}`,
+        },
+        body: JSON.stringify({
+          // name НЕ меняем через API автора (нужен модератор), но сохраняем
+          // bio/region/city/foundedYear
+          bio: form.bio,
+          region: form.region,
+          city: form.city,
+        }),
+      });
+      await reload();
+      setEditing(false);
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -103,7 +169,7 @@ export default function AuthorOverviewPage() {
             accept="image/jpeg,image/jpg,image/png,image/webp"
             className="hidden"
             disabled={avatarUploading}
-            onChange={(e) => uploadAvatar(e.target.files?.[0] || null)}
+            onChange={(e) => handleSelectFile(e.target.files?.[0] || null)}
           />
         </label>
         <div className="relative z-10 max-w-2xl">
@@ -189,7 +255,7 @@ export default function AuthorOverviewPage() {
                 accept="image/jpeg,image/jpg,image/png,image/webp"
                 className="hidden"
                 disabled={avatarUploading}
-                onChange={(e) => uploadAvatar(e.target.files?.[0] || null)}
+                onChange={(e) => handleSelectFile(e.target.files?.[0] || null)}
               />
             </label>
             <div className="flex-1 min-w-0">
@@ -208,19 +274,107 @@ export default function AuthorOverviewPage() {
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            <Info label="Сценическое имя" value={me.artist.name} />
-            <Info label="Slug" value={me.artist.slug} />
-            <Info label="Регион" value={me.artist.region || '—'} />
-            <Info label="Город" value={me.artist.city || '—'} />
-            <Info label="Подписчики" value={me.artist.followers ?? 0} />
-            <Info label="Верифицирован" value={me.artist.verified ? 'Да' : 'Нет'} />
-          </div>
-          <Link
-            href={`/artist/${me.artist.slug}`}
-            className="inline-block mt-1 text-sm underline decoration-gray-400 hover:decoration-black underline-offset-2">
-            Открыть публичный профиль
-          </Link>
+          {editing ? (
+            <div className="space-y-3">
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Сценическое имя</label>
+                  <input
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    disabled
+                    title="Сценическое имя изменяется только администратором"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-gray-50 text-gray-500 text-sm"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">Меняется только администратором</p>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Регион</label>
+                  <select
+                    value={form.region}
+                    onChange={(e) => setForm({ ...form, region: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none">
+                    <option value="">— не указан —</option>
+                    {form.region && !regions.some((r) => r.name === form.region) && (
+                      <option value={form.region}>{form.region}</option>
+                    )}
+                    {regions.map((r) => (
+                      <option key={r.id} value={r.name}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Город</label>
+                  <input
+                    value={form.city}
+                    onChange={(e) => setForm({ ...form, city: e.target.value })}
+                    placeholder="Москва"
+                    className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Slug</label>
+                  <input
+                    value={me.artist.slug}
+                    disabled
+                    className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-gray-50 text-gray-500 text-sm font-mono"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">О себе (биография)</label>
+                <textarea
+                  value={form.bio}
+                  onChange={(e) => setForm({ ...form, bio: e.target.value })}
+                  rows={3}
+                  placeholder="Короткое описание для публичного профиля"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none resize-none"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="px-5 py-2 rounded-full bg-white border border-gray-300 text-gray-900 font-medium hover:bg-gray-100 transition-colors">
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={saveProfile}
+                  disabled={savingProfile}
+                  className="px-5 py-2 rounded-full bg-black text-white font-medium hover:bg-gray-800 transition-colors disabled:opacity-50">
+                  {savingProfile ? 'Сохраняем…' : 'Сохранить'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <Info label="Сценическое имя" value={me.artist.name} />
+                <Info label="Slug" value={me.artist.slug} />
+                <Info label="Регион" value={me.artist.region || '—'} />
+                <Info label="Город" value={me.artist.city || '—'} />
+                <Info label="Подписчики" value={me.artist.followers ?? 0} />
+                <Info label="Верифицирован" value={me.artist.verified ? 'Да' : 'Нет'} />
+              </div>
+              {me.artist.bio && (
+                <p className="text-sm text-gray-700 mt-3 whitespace-pre-wrap">{me.artist.bio}</p>
+              )}
+              <div className="flex gap-3 items-center mt-1">
+                <button
+                  type="button"
+                  onClick={openEdit}
+                  className="text-sm px-4 py-2 rounded-full bg-gray-100 text-gray-900 hover:bg-gray-200 font-medium transition-colors">
+                  Редактировать
+                </button>
+                <Link
+                  href={`/artist/${me.artist.slug}`}
+                  className="text-sm underline decoration-gray-400 hover:decoration-black underline-offset-2">
+                  Открыть публичный профиль
+                </Link>
+              </div>
+            </>
+          )}
         </section>
       )}
 
@@ -240,6 +394,15 @@ export default function AuthorOverviewPage() {
             <Info label="Верифицирован" value={me.collective.verified ? 'Да' : 'Нет'} />
           </div>
         </section>
+      )}
+
+      {/* Модалка кадрирования фото */}
+      {pendingFile && (
+        <AvatarCropModal
+          file={pendingFile}
+          onCancel={() => setPendingFile(null)}
+          onDone={uploadCroppedAvatar}
+        />
       )}
     </div>
   );

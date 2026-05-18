@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authStorage } from '@/app/lib/auth';
+import AvatarCropModal from '@/app/author/components/AvatarCropModal';
 
 type Me = {
   user: {
@@ -42,13 +43,19 @@ export default function AuthorLayout({ children }: { children: React.ReactNode }
   const [needsLogin, setNeedsLogin] = useState(false);
   const [notAuthor, setNotAuthor] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
-  // Загрузка/смена аватарки артиста через клик по кружку в сайдбаре
-  const uploadAvatar = async (file: File | null) => {
-    if (!file || !me?.artist) return;
+  // Файл сначала идёт в кадрировщик; после Готово — финальная загрузка
+  const handleSelectFile = (f: File | null) => {
+    if (f) setPendingFile(f);
+  };
+  const uploadCroppedAvatar = async (blob: Blob) => {
+    if (!me?.artist) return;
+    setPendingFile(null);
     setAvatarUploading(true);
     try {
       const fd = new FormData();
+      const file = new File([blob], 'avatar.png', { type: 'image/png' });
       fd.append('file', file);
       fd.append('artistSlug', me.artist.slug || me.artist.id || 'artist');
       const ur = await fetch('/api/upload/avatar', { method: 'POST', body: fd });
@@ -63,7 +70,6 @@ export default function AuthorLayout({ children }: { children: React.ReactNode }
         },
         body: JSON.stringify({ avatar: avatarUrl }),
       });
-      // Локально обновляем чтобы кружок поменялся сразу
       setMe((prev) => (prev && prev.artist
         ? { ...prev, artist: { ...prev.artist, avatar: avatarUrl } }
         : prev));
@@ -188,7 +194,7 @@ export default function AuthorLayout({ children }: { children: React.ReactNode }
                   accept="image/jpeg,image/jpg,image/png,image/webp"
                   className="hidden"
                   disabled={avatarUploading || !me?.artist}
-                  onChange={(e) => uploadAvatar(e.target.files?.[0] || null)}
+                  onChange={(e) => handleSelectFile(e.target.files?.[0] || null)}
                 />
               </label>
               <div className="min-w-0">
@@ -233,6 +239,15 @@ export default function AuthorLayout({ children }: { children: React.ReactNode }
         {/* Content */}
         <div className="min-w-0">{children}</div>
       </div>
+
+      {/* Кадрирование загружаемой аватарки */}
+      {pendingFile && (
+        <AvatarCropModal
+          file={pendingFile}
+          onCancel={() => setPendingFile(null)}
+          onDone={uploadCroppedAvatar}
+        />
+      )}
     </main>
   );
 }
