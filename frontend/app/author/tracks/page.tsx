@@ -289,10 +289,29 @@ function EditTrackInline({
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
 
+  // Список регионов России для выпадающего списка "Место записи"
+  const [regions, setRegions] = useState<{ id: string; name: string }[]>([]);
+
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Список регионов — для dropdown
+  useEffect(() => {
+    fetch('/api/map/regions')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success && Array.isArray(j.data)) {
+          setRegions(
+            j.data
+              .map((r: any) => ({ id: r.id, name: r.name }))
+              .sort((a: any, b: any) => a.name.localeCompare(b.name, 'ru'))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Подгрузить полные данные
   useEffect(() => {
@@ -549,7 +568,21 @@ function EditTrackInline({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Место записи</label>
-            <input value={recordingPlace} onChange={(e) => setRecordingPlace(e.target.value)} className={inputCls} />
+            <select
+              value={recordingPlace}
+              onChange={(e) => setRecordingPlace(e.target.value)}
+              className={inputCls}>
+              <option value="">— не указано —</option>
+              {/* Если в значении уже есть что-то нестандартное (ввели вручную до dropdown), сохраняем */}
+              {recordingPlace && !regions.some((r) => r.name === recordingPlace) && (
+                <option value={recordingPlace}>{recordingPlace}</option>
+              )}
+              {regions.map((r) => (
+                <option key={r.id} value={r.name}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <div>
