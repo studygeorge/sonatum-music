@@ -751,36 +751,13 @@ export default function TracksPage() {
                       </div>
                     )}
 
-                    {/* Опубликованный трек с правками — отдельные действия для правок */}
+                    {/* Опубликованный трек с правками — детальный diff + действия */}
                     {track.status === 'PUBLISHED' && track.metadata?.hasPendingChanges && (
-                      <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
-                        <div className="text-sm font-medium text-gray-900">
-                          Автор внёс правки в опубликованный трек
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {(() => {
-                            const pc = track.metadata?.pendingChanges || {};
-                            const keys = Object.keys(pc);
-                            return keys.length
-                              ? `Изменено полей: ${keys.length} (${keys.join(', ')})`
-                              : 'Нет данных о правках';
-                          })()}
-                        </div>
-                        <div className="flex gap-3 pt-1">
-                          <button
-                            onClick={() => handleApprovePending(track.id)}
-                            className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors text-sm">
-                            <CheckCircle className="w-4 h-4" />
-                            Одобрить правки
-                          </button>
-                          <button
-                            onClick={() => handleRejectPending(track.id)}
-                            className="flex items-center gap-2 px-4 py-2 bg-white text-black border-2 border-black rounded-xl hover:bg-gray-100 transition-colors text-sm">
-                            <XCircle className="w-4 h-4" />
-                            Отклонить правки
-                          </button>
-                        </div>
-                      </div>
+                      <PendingChangesPanel
+                        track={track}
+                        onApprove={() => handleApprovePending(track.id)}
+                        onReject={() => handleRejectPending(track.id)}
+                      />
                     )}
                   </div>
                 </div>
@@ -871,3 +848,160 @@ export default function TracksPage() {
     </div>
   );
 }
+
+
+// ----------------------------------------------------------------------------
+// Панель с детальным diff правок опубликованного трека:
+// показывает каждое изменённое поле (старое значение → новое значение),
+// для файлов (cover, audioUrl, instrumentalUrl, sheetUrl) — кликабельные
+// ссылки, для PDF — превью в iframe.
+// ----------------------------------------------------------------------------
+
+const FIELD_LABEL: Record<string, string> = {
+  title: "Название",
+  lyrics: "Текст",
+  cover: "Обложка",
+  price: "Цена основной (₽)",
+  instrumentalPrice: "Цена минусовки (₽)",
+  isForSale: "Продаётся",
+  isFree: "Бесплатно",
+  bpm: "BPM",
+  key: "Тональность",
+  releaseDate: "Дата релиза",
+  audioUrl: "Основной аудиофайл",
+  instrumentalUrl: "Минусовка",
+  audioType: "Тип аудио",
+  sheetUrl: "Ноты (PDF)",
+  era: "Эпоха",
+  mood: "Настроение",
+  instruments: "Инструменты",
+  difficulty: "Сложность",
+  tempo: "Темп",
+  recordingYear: "Год записи",
+  recordingPlace: "Место записи",
+  originalComposer: "Автор оригинала",
+  contentType: "Тип контента",
+  allowDonations: "Принимать донаты",
+  allowExclusive: "Эксклюзивная лицензия",
+};
+
+function fmtValue(v: any): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "boolean") return v ? "да" : "нет";
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+
+function isFileField(k: string) {
+  return ["cover", "audioUrl", "instrumentalUrl", "sheetUrl"].includes(k);
+}
+
+function PendingChangesPanel({
+  track,
+  onApprove,
+  onReject,
+}: {
+  track: any;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const [showPdf, setShowPdf] = useState(false);
+  const pc = track.metadata?.pendingChanges || {};
+  const keys = Object.keys(pc);
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-200 space-y-3">
+      <div className="text-sm font-medium text-gray-900">
+        Автор внёс правки в опубликованный трек
+      </div>
+
+      {keys.length === 0 ? (
+        <div className="text-xs text-gray-500">Нет данных о правках</div>
+      ) : (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-100 text-xs text-gray-500 uppercase">
+              <tr>
+                <th className="text-left px-3 py-2">Поле</th>
+                <th className="text-left px-3 py-2">Было</th>
+                <th className="text-left px-3 py-2">Станет</th>
+              </tr>
+            </thead>
+            <tbody>
+              {keys.map((k) => {
+                const newVal = pc[k];
+                const oldVal =
+                  k === "sheetUrl"
+                    ? track.sheetMusic?.pdfUrl ?? null
+                    : track[k] ?? null;
+                const file = isFileField(k);
+                return (
+                  <tr key={k} className="border-t border-gray-200">
+                    <td className="px-3 py-2 align-top font-medium text-gray-900">
+                      {FIELD_LABEL[k] || k}
+                    </td>
+                    <td className="px-3 py-2 align-top text-gray-700">
+                      {file && oldVal ? (
+                        <a href={String(oldVal)} target="_blank" rel="noreferrer" className="underline text-gray-700 hover:text-black break-all">
+                          открыть текущий
+                        </a>
+                      ) : (
+                        <span className="break-all">{fmtValue(oldVal)}</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 align-top text-gray-900">
+                      {file && newVal ? (
+                        <div className="space-y-1">
+                          <a href={String(newVal)} target="_blank" rel="noreferrer" className="underline font-medium text-gray-900 hover:text-black break-all">
+                            открыть новый
+                          </a>
+                          {k === "sheetUrl" && (
+                            <button
+                              onClick={() => setShowPdf((v) => !v)}
+                              className="block text-xs text-gray-500 underline hover:text-black">
+                              {showPdf ? "скрыть превью" : "показать превью PDF"}
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="break-all">{fmtValue(newVal)}</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Превью PDF для нот */}
+      {showPdf && pc.sheetUrl && (
+        <div className="bg-white border border-gray-300 rounded-xl overflow-hidden">
+          <div className="px-3 py-2 bg-gray-100 border-b border-gray-200 text-xs text-gray-700 flex items-center justify-between">
+            <span>Превью нот · {pc.sheetUrl}</span>
+            <a href={pc.sheetUrl} target="_blank" rel="noreferrer" className="underline">скачать</a>
+          </div>
+          <iframe src={pc.sheetUrl} className="w-full h-[600px]" />
+        </div>
+      )}
+
+      <div className="flex gap-3 pt-1 flex-wrap">
+        <button
+          onClick={onApprove}
+          className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors text-sm">
+          <CheckCircle className="w-4 h-4" />
+          Одобрить правки
+        </button>
+        <button
+          onClick={onReject}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-black border-2 border-black rounded-xl hover:bg-gray-100 transition-colors text-sm">
+          <XCircle className="w-4 h-4" />
+          Отклонить правки
+        </button>
+      </div>
+    </div>
+  );
+}
+
