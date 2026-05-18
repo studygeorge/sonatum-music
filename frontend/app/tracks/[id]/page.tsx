@@ -117,8 +117,15 @@ export default function TrackPage({ params }: { params: { id: string } }) {
               <h1 className="text-2xl sm:text-4xl md:text-7xl font-black tracking-tighter mb-1.5 md:mb-4 text-[#1c1c1e] leading-tight truncate w-full">{track.title}</h1>
               
               <div className="flex items-center gap-1.5 md:gap-3 mb-2 md:mb-8 text-[11px] md:text-[15px]">
-                 <Link href={`/artist/${track.artist?.slug || track.artist?.id || '1'}`} className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-gray-300 overflow-hidden inline-block shrink-0">
-                    <img src={track.artist?.avatar || track.cover || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100'} className="w-full h-full object-cover" alt="artist" />
+                 <Link
+                   href={`/artist/${track.artist?.slug || track.artist?.id || '1'}`}
+                   className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-gray-200 overflow-hidden inline-flex items-center justify-center shrink-0 text-[10px] md:text-[11px] font-bold text-gray-700"
+                 >
+                   {track.artist?.avatar ? (
+                     <img src={track.artist.avatar} className="w-full h-full object-cover" alt={track.artist.name || ''} />
+                   ) : (
+                     <span>{(track.artist?.name || '?').trim()[0]?.toUpperCase() || '?'}</span>
+                   )}
                  </Link>
                  <Link href={`/artist/${track.artist?.slug || track.artist?.id || '1'}`} className="font-semibold hover:underline uppercase text-[#1c1c1e] tracking-wide truncate max-w-[120px] md:max-w-none">
                     {track.artist?.name || 'Неизвестный'}
@@ -290,8 +297,12 @@ export default function TrackPage({ params }: { params: { id: string } }) {
             
             <h3 className="text-2xl font-black mb-4 tracking-tight text-[#1c1c1e]">Сингл</h3>
             <div className="flex items-center gap-4 mb-8">
-               <div className="w-16 h-16 rounded-[1rem] bg-gray-200 overflow-hidden shadow-sm shrink-0">
-                   <img src={track.cover || 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?auto=format&fit=crop&q=80&w=200'} className="w-full h-full object-cover" alt="cover_mini" />
+               <div className="w-16 h-16 rounded-[1rem] bg-gray-200 overflow-hidden shadow-sm shrink-0 flex items-center justify-center text-lg font-bold text-gray-400">
+                   {track.cover ? (
+                     <img src={track.cover} className="w-full h-full object-cover" alt="cover" />
+                   ) : (
+                     <span>{(track.title || '?').trim()[0]?.toUpperCase() || '?'}</span>
+                   )}
                </div>
                <div className="flex flex-col justify-center">
                   <div className="font-bold text-[17px] text-[#1c1c1e] flex items-center gap-1 group cursor-pointer hover:underline">
@@ -373,7 +384,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
             ></textarea>
             <div className="flex justify-end gap-3">
               <button className="apple-button-secondary" onClick={() => setReportModalOpen(false)}>Отмена</button>
-              <button className="bg-red-500 text-white px-6 py-2 rounded-full font-medium hover:bg-red-600 transition-colors" onClick={submitReport}>Отправить</button>
+              <button className="bg-black text-white px-6 py-2 rounded-full font-medium hover:bg-gray-800 transition-colors" onClick={submitReport}>Отправить</button>
             </div>
           </div>
         </div>
