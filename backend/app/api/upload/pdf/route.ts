@@ -4,13 +4,15 @@ import { parseForm, validatePdfFile, savePdfFile } from '@/lib/fileUpload';
 export async function POST(req: NextRequest) {
   try {
     const { fields, file } = await parseForm(req);
-    const { titleSlug } = fields;
+    // Принимаем разные имена slug-поля для обратной совместимости:
+    // /author/upload шлёт trackSlug, /sheets/upload шлёт titleSlug.
+    const slug = fields.titleSlug || fields.trackSlug || fields.slug;
 
     if (!file) {
       return NextResponse.json({ success: false, error: 'PDF файл не найден' }, { status: 400 });
     }
-    if (!titleSlug) {
-      return NextResponse.json({ success: false, error: 'Не указан titleSlug' }, { status: 400 });
+    if (!slug) {
+      return NextResponse.json({ success: false, error: 'Не указан titleSlug/trackSlug' }, { status: 400 });
     }
 
     const validation = validatePdfFile(file);
@@ -18,7 +20,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
     }
 
-    const result = await savePdfFile(file.buffer, file.filename, titleSlug);
+    const result = await savePdfFile(file.buffer, file.filename, slug);
 
     return NextResponse.json({ success: true, data: result });
   } catch (error) {

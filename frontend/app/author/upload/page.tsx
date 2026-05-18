@@ -185,8 +185,10 @@ export default function UploadWizardPage() {
         });
         const aj = await ar.json();
         if (!aj.success) throw new Error(aj.error || 'Ошибка загрузки аудио');
-        audioUrl = aj.url || aj.audioUrl || aj.data?.url || '';
-        duration = aj.duration || aj.data?.duration || 180;
+        // Backend returns { success: true, data: { audioUrl, filename, size, mimetype, fullPath } }
+        audioUrl = aj.data?.audioUrl || aj.audioUrl || aj.url || '';
+        duration = aj.data?.duration || aj.duration || 180;
+        if (!audioUrl) throw new Error('Сервер вернул пустой audioUrl');
       }
 
       // 2. Upload cover (если есть)
@@ -201,7 +203,7 @@ export default function UploadWizardPage() {
           body: fd,
         });
         const cj = await cr.json();
-        if (cj.success) coverUrl = cj.url || cj.coverUrl || cj.data?.url || '';
+        if (cj.success) coverUrl = cj.data?.coverUrl || cj.data?.url || cj.coverUrl || cj.url || '';
       }
 
       // 3. Upload sheet PDF (если есть)
@@ -216,7 +218,7 @@ export default function UploadWizardPage() {
           body: fd,
         });
         const sj = await sr.json();
-        if (sj.success) sheetUrl = sj.url || sj.pdfUrl || sj.data?.url || '';
+        if (sj.success) sheetUrl = sj.data?.pdfUrl || sj.data?.url || sj.pdfUrl || sj.url || '';
       }
 
       // 4. Upload minus audio (если есть) — с kind=instrumental
@@ -232,7 +234,7 @@ export default function UploadWizardPage() {
           body: fd,
         });
         const mj = await mr.json();
-        if (mj.success) minusUrl = mj.url || mj.audioUrl || mj.data?.audioUrl || mj.data?.url || '';
+        if (mj.success) minusUrl = mj.data?.audioUrl || mj.audioUrl || mj.url || '';
       }
 
       // 5. Создаём Track
