@@ -21,8 +21,15 @@ function AuthorSettingsPageInner() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
-  const handleLogout = async () => {
-    await api.logout().catch(() => {});
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  // Открыть подтверждение
+  const handleLogout = () => setShowLogoutConfirm(true);
+
+  // Реальный выход после подтверждения
+  const confirmLogout = async () => {
+    setShowLogoutConfirm(false);
+    try { await (api as any).logout?.(); } catch {}
     authStorage.clear();
     window.location.href = '/';
   };
@@ -77,7 +84,7 @@ function AuthorSettingsPageInner() {
         </div>
       </section>
       {banner && (
-        <div className="apple-card p-4 bg-green-50 border-green-200 text-sm text-green-800">
+        <div className="apple-card p-4 bg-gray-50 border border-gray-300 text-sm text-gray-900">
           {banner}
         </div>
       )}
@@ -173,7 +180,7 @@ function AuthorSettingsPageInner() {
         </p>
         <button
           onClick={handleLogout}
-          className="px-5 py-2.5 rounded-full bg-red-50 text-red-600 hover:bg-red-100 font-medium text-sm transition-colors"
+          className="px-5 py-2.5 rounded-full bg-white border border-black text-black hover:bg-gray-100 font-medium text-sm transition-colors"
         >
           Выйти из аккаунта
         </button>
@@ -191,7 +198,7 @@ function AuthorSettingsPageInner() {
               <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 px-4 py-3 rounded-xl font-medium bg-[var(--hover)] hover:bg-[var(--border)] transition-colors">
                 Отмена
               </button>
-              <button onClick={confirmLogout} className="flex-1 px-4 py-3 rounded-xl font-medium text-white bg-red-500 hover:bg-red-600 transition-colors">
+              <button onClick={confirmLogout} className="flex-1 px-4 py-3 rounded-xl font-medium text-white bg-black hover:bg-gray-800 transition-colors">
                 Выйти
               </button>
             </div>
