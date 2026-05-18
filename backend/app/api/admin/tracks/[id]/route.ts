@@ -57,9 +57,32 @@ export async function GET(
         );
       }
 
+      // Подтягиваем V2-поля (snake_case колонки которых нет в Prisma-модели)
+      const rows: any[] = await prisma.$queryRawUnsafe(
+        `SELECT content_type, original_composer, recording_year, recording_place,
+                era, mood, instruments, difficulty, tempo,
+                allow_donations, allow_exclusive
+           FROM tracks WHERE id = $1`,
+        id
+      );
+      const extra = rows?.[0] || {};
+
       return NextResponse.json({
         success: true,
-        data: track
+        data: {
+          ...track,
+          contentType: extra.content_type,
+          originalComposer: extra.original_composer,
+          recordingYear: extra.recording_year,
+          recordingPlace: extra.recording_place,
+          era: extra.era,
+          mood: extra.mood,
+          instruments: extra.instruments,
+          difficulty: extra.difficulty,
+          tempo: extra.tempo,
+          allowDonations: extra.allow_donations,
+          allowExclusive: extra.allow_exclusive,
+        },
       });
 
     } catch (error) {
@@ -104,10 +127,10 @@ export async function PATCH(
         );
       }
 
-      const { 
-        title, 
-        slug, 
-        duration, 
+      const {
+        title,
+        slug,
+        duration,
         audioUrl,
         cover,
         lyrics,
@@ -124,7 +147,24 @@ export async function PATCH(
         sheetInstrument,
         sheetDifficulty,
         sheetPrice,
-        isPublicDomain
+        isPublicDomain,
+        // Расширенный набор
+        instrumentalUrl,
+        instrumentalPrice,
+        audioType,
+        releaseDate,
+        // V2-поля
+        contentType,
+        originalComposer,
+        recordingYear,
+        recordingPlace,
+        era,
+        mood,
+        instruments,
+        difficulty,
+        tempo,
+        allowDonations,
+        allowExclusive,
       } = body;
 
       // Обновляем основные поля трека
@@ -133,14 +173,20 @@ export async function PATCH(
       if (slug !== undefined) updateData.slug = slug;
       if (duration !== undefined) updateData.duration = duration;
       if (audioUrl !== undefined) updateData.audioUrl = audioUrl;
-      if (cover !== undefined) updateData.cover = cover; 
+      if (cover !== undefined) updateData.cover = cover;
       if (lyrics !== undefined) updateData.lyrics = lyrics;
-      if (bpm !== undefined) updateData.bpm = bpm;
-      if (key !== undefined) updateData.key = key;
-      if (price !== undefined) updateData.price = price;
-      if (isFree !== undefined) updateData.isFree = isFree;
-      if (isForSale !== undefined) updateData.isForSale = isForSale;
+      if (bpm !== undefined) updateData.bpm = bpm ? Number(bpm) : null;
+      if (key !== undefined) updateData.key = key || null;
+      if (price !== undefined) updateData.price = price === '' || price === null ? null : Number(price);
+      if (isFree !== undefined) updateData.isFree = !!isFree;
+      if (isForSale !== undefined) updateData.isForSale = !!isForSale;
       if (albumId !== undefined) updateData.albumId = albumId;
+      if (releaseDate !== undefined) updateData.releaseDate = releaseDate ? new Date(releaseDate) : null;
+      if (instrumentalUrl !== undefined) updateData.instrumentalUrl = instrumentalUrl || null;
+      if (instrumentalPrice !== undefined) updateData.instrumentalPrice = instrumentalPrice === '' || instrumentalPrice === null ? null : Number(instrumentalPrice);
+      if (audioType && ['FULL', 'INSTRUMENTAL', 'BOTH'].includes(audioType)) {
+        updateData.audioType = audioType;
+      }
       if (status !== undefined) {
         updateData.status = status;
         if (status === 'PUBLISHED' && !existingTrack.publishedAt) {
@@ -180,6 +226,45 @@ export async function PATCH(
         where: { id },
         data: updateData
       });
+
+      // V2-поля через raw SQL (snake_case колонки)
+      const hasExtras =
+        contentType !== undefined || originalComposer !== undefined ||
+        recordingYear !== undefined || recordingPlace !== undefined ||
+        era !== undefined || mood !== undefined ||
+        instruments !== undefined || difficulty !== undefined ||
+        tempo !== undefined || allowDonations !== undefined ||
+        allowExclusive !== undefined;
+      if (hasExtras) {
+        await prisma.$executeRawUnsafe(
+          `UPDATE tracks SET
+             content_type = COALESCE($1, content_type),
+             original_composer = COALESCE($2, original_composer),
+             recording_year = COALESCE($3, recording_year),
+             recording_place = COALESCE($4, recording_place),
+             era = COALESCE($5, era),
+             mood = COALESCE($6, mood),
+             instruments = COALESCE($7::jsonb, instruments),
+             difficulty = COALESCE($8, difficulty),
+             tempo = COALESCE($9, tempo),
+             allow_donations = COALESCE($10, allow_donations),
+             allow_exclusive = COALESCE($11, allow_exclusive),
+             "updatedAt" = now()
+           WHERE id = $12`,
+          contentType || null,
+          originalComposer || null,
+          recordingYear ? Number(recordingYear) : null,
+          recordingPlace || null,
+          era || null,
+          mood || null,
+          instruments ? (Array.isArray(instruments) ? JSON.stringify(instruments) : (typeof instruments === 'string' ? JSON.stringify(instruments.split(',').map((s: string) => s.trim()).filter(Boolean)) : JSON.stringify(instruments))) : null,
+          difficulty || null,
+          tempo || null,
+          allowDonations === undefined ? null : !!allowDonations,
+          allowExclusive === undefined ? null : !!allowExclusive,
+          id
+        );
+      }
 
       // Обновляем жанры
       if (genreIds !== undefined) {
