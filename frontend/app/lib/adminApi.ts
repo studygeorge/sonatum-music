@@ -130,6 +130,8 @@ export const adminApi = {
   artists: {
     getAll: (params?: { page?: number; limit?: number; search?: string }) =>
       request(`/api/admin/artists${buildQueryString(params || {})}`),
+    getById: (id: string) =>
+      request(`/api/admin/artists/${id}`),
     create: (data: any) =>
       request('/api/admin/artists', {
         method: 'POST',

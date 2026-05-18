@@ -9,6 +9,7 @@ import CreateArtistModal from './components/CreateArtistModal';
 import EditArtistModal from './components/EditArtistModal';
 import ViewTracksModal from './components/ViewTracksModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
+import ArtistDetailDrawer from '../components/ArtistDetailDrawer';
 
 interface Artist {
   id: string;
@@ -38,6 +39,9 @@ export default function ArtistsPage() {
   const [showViewTracksModal, setShowViewTracksModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
+
+  // Drawer профиля артиста (клик на имя/карточку — полная информация + контакты)
+  const [artistDrawerId, setArtistDrawerId] = useState<string | null>(null);
 
   // Множественный выбор
   const [selectedArtists, setSelectedArtists] = useState<Set<string>>(new Set());
@@ -342,9 +346,14 @@ export default function ArtistsPage() {
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-lg font-semibold text-gray-900 truncate">
+                        <button
+                          type="button"
+                          onClick={() => setArtistDrawerId(artist.id)}
+                          className="text-lg font-semibold text-gray-900 truncate hover:text-blue-600 hover:underline transition-colors text-left"
+                          title="Открыть полный профиль артиста"
+                        >
                           {artist.name}
-                        </h3>
+                        </button>
                         {artist.verified && (
                           <CheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />
                         )}
@@ -453,6 +462,12 @@ export default function ArtistsPage() {
         count={selectedArtists.size}
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={confirmDelete}
+      />
+
+      {/* Drawer: полный профиль артиста — контакты, выплаты, треки, ноты, B2B, жалобы */}
+      <ArtistDetailDrawer
+        artistId={artistDrawerId}
+        onClose={() => setArtistDrawerId(null)}
       />
     </div>
   );

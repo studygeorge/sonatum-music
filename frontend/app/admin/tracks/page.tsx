@@ -9,6 +9,7 @@ import CreateTrackModal from './components/CreateTrackModal';
 import EditTrackModal from './components/EditTrackModal';
 import RejectTrackModal from './components/RejectTrackModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
+import ArtistDetailDrawer from '../components/ArtistDetailDrawer';
 
 interface Track {
   id: string;
@@ -73,6 +74,9 @@ export default function TracksPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+
+  // Drawer профиля артиста (открывается по клику на имя)
+  const [artistDrawerId, setArtistDrawerId] = useState<string | null>(null);
 
   // Множественный выбор
   const [selectedTracks, setSelectedTracks] = useState<Set<string>>(new Set());
@@ -548,9 +552,19 @@ export default function TracksPage() {
                           {track.title}
                         </h3>
                         <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <span>{track.artist.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setArtistDrawerId(track.artist.id)}
+                            className="hover:underline hover:text-blue-700 font-medium text-blue-600 transition-colors"
+                            title="Открыть профиль артиста"
+                          >
+                            {track.artist.name}
+                          </button>
                           {track.artist.verified && (
                             <CheckCircle className="w-4 h-4 text-blue-500" />
+                          )}
+                          {track.artist.user?.email && (
+                            <span className="text-xs text-gray-400">· {track.artist.user.email}</span>
                           )}
                           {track.album && (
                             <>
@@ -743,6 +757,12 @@ export default function TracksPage() {
         count={selectedTracks.size}
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={confirmDelete}
+      />
+
+      {/* Drawer: профиль артиста (открывается по клику на имя) */}
+      <ArtistDetailDrawer
+        artistId={artistDrawerId}
+        onClose={() => setArtistDrawerId(null)}
       />
 
       <style jsx>{`
