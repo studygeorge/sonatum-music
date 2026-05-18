@@ -7,6 +7,7 @@ export async function POST(request: NextRequest) {
   return withRole(request, ['ARTIST', 'ADMIN', 'SUPER_ADMIN'], async (req, session) => {
     try {
       const body = await request.json();
+      console.log('[TRACKS POST] payload:', JSON.stringify(body).slice(0, 500));
       const {
         title,
         duration,
@@ -28,12 +29,14 @@ export async function POST(request: NextRequest) {
         instrumentalPrice
       } = body;
 
-      if (!title || !duration || !audioUrl) {
-        return NextResponse.json(
-          { success: false, error: 'Missing required fields' },
-          { status: 400 }
-        );
-      }
+      // Permissive: проставляем разумные дефолты вместо отказа.
+      // Жёстко обязательно — хотя бы что-то идентифицирующее. Если нет ничего,
+      // делаем "Без названия" + текущий timestamp.
+      const safeTitle: string =
+        (title && String(title).trim()) ||
+        `Без названия ${new Date().toLocaleDateString('ru-RU')}`;
+      const safeDuration: number = Number(duration) > 0 ? Number(duration) : 180;
+      const safeAudioUrl: string = audioUrl || instrumentalUrl || '';
 
       const artist = await prisma.artist.findUnique({
         where: { userId: session.userId }
@@ -46,35 +49,36 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const slug = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
+      const slug = `${safeTitle.toLowerCase().replace(/[^a-z0-9а-я0-9]+/gi, '-').replace(/^-+|-+$/g, '') || 'track'}-${Date.now().toString(36)}`;
 
-      // Валидация audioType — должно быть согласовано с наличием файлов
-      const normalizedAudioType: 'FULL' | 'INSTRUMENTAL' | 'BOTH' =
-        audioType === 'INSTRUMENTAL' || audioType === 'BOTH' ? audioType : 'FULL';
-
-      if (normalizedAudioType !== 'FULL' && !instrumentalUrl) {
-        return NextResponse.json(
-          { success: false, error: 'Для типа INSTRUMENTAL/BOTH требуется instrumentalUrl' },
-          { status: 400 }
-        );
+      // Permissive: автоматически подбираем audioType от наличия файлов вместо отказа.
+      let normalizedAudioType: 'FULL' | 'INSTRUMENTAL' | 'BOTH';
+      if (audioType === 'BOTH' && audioUrl && instrumentalUrl) {
+        normalizedAudioType = 'BOTH';
+      } else if (instrumentalUrl && !audioUrl) {
+        normalizedAudioType = 'INSTRUMENTAL';
+      } else if (audioUrl && instrumentalUrl) {
+        normalizedAudioType = 'BOTH';
+      } else {
+        normalizedAudioType = 'FULL';
       }
 
       const track = await prisma.track.create({
         data: {
-          title,
+          title: safeTitle,
           slug,
-          duration,
-          audioUrl,
-          cover,
-          lyrics,
-          bpm,
-          key,
-          price,
-          isFree: isFree || false,
-          isForSale: isForSale || false,
-          format,
+          duration: safeDuration,
+          audioUrl: safeAudioUrl,
+          cover: cover || null,
+          lyrics: lyrics || null,
+          bpm: bpm ? Number(bpm) : null,
+          key: key || null,
+          price: price ? Number(price) : null,
+          isFree: !!isFree,
+          isForSale: !!isForSale,
+          format: format || null,
           artistId: artist.id,
-          albumId,
+          albumId: albumId || null,
           releaseDate: releaseDate ? new Date(releaseDate) : null,
           status: 'PENDING',
           audioType: normalizedAudioType,

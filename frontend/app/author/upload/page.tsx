@@ -141,34 +141,27 @@ export default function UploadWizardPage() {
     e.preventDefault();
     setError('');
 
+    // Permissive validation: ругаемся только на действительно критичные вещи
+    // (нет прав или нет профиля). Всё остальное — пытаемся загрузить, бэк
+    // подставит дефолты (см. /api/tracks POST).
     if (!rightsConfirmed) {
       setError('Подтвердите согласие с правами');
-      return;
-    }
-    if (!title.trim()) {
-      setError('Введите название');
-      return;
-    }
-    if (contentType !== 'SHEET_ONLY' && !audioFile) {
-      setError('Загрузите аудиофайл');
-      return;
-    }
-    if (contentType === 'SHEET_ONLY' && !sheetPdfFile) {
-      setError('Загрузите PDF с нотами');
-      return;
-    }
-    if (contentType === 'COVER' && !originalComposer.trim()) {
-      setError('Укажите автора оригинала');
       return;
     }
     if (!artistSlug) {
       setError('Профиль автора не найден');
       return;
     }
+    // Должен быть хоть какой-то контент: или аудио, или ноты, или минусовка.
+    if (!audioFile && !sheetPdfFile && !minusAudioFile) {
+      setError('Загрузите хотя бы один файл (аудио, минусовку или ноты)');
+      return;
+    }
 
     setSubmitting(true);
     try {
-      const trackSlug = `${slugify(title.trim())}-${Date.now().toString(36)}`;
+      const effectiveTitle = title.trim() || (audioFile?.name || sheetPdfFile?.name || 'Без названия').replace(/\.[^.]+$/, '');
+      const trackSlug = `${slugify(effectiveTitle) || 'track'}-${Date.now().toString(36)}`;
       const token = authStorage.getToken() || '';
 
       // 1. Upload audio (если есть)
@@ -243,9 +236,9 @@ export default function UploadWizardPage() {
         !!audioUrl && !!minusUrl ? 'BOTH' : minusUrl && !audioUrl ? 'INSTRUMENTAL' : 'FULL';
 
       const trackPayload: any = {
-        title: title.trim(),
+        title: effectiveTitle,
         duration: duration || 180,
-        audioUrl: audioUrl || minusUrl,
+        audioUrl: audioUrl || minusUrl || '',
         cover: coverUrl || undefined,
         lyrics: lyrics.trim() || undefined,
         releaseDate: new Date().toISOString(),
@@ -300,11 +293,11 @@ export default function UploadWizardPage() {
         }),
       }).catch(() => {}); // не блокируем основное создание
 
-      // 7. Лицензии
+      // 7. Лицензии — не блокируем основное создание, если не сохранятся
       const licsList = Object.entries(selectedLicenses)
         .filter(([_, v]) => v.selected)
         .map(([code, v]) => ({ code, price: v.price }));
-      if (licsList.length> 0) {
+      if (licsList.length > 0) {
         await fetch(`/api/tracks/${trackId}/licenses`, {
           method: 'PUT',
           headers: {
@@ -312,12 +305,13 @@ export default function UploadWizardPage() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ licenses: licsList }),
-        });
+        }).catch(() => {});
       }
 
       router.push('/author/tracks?uploaded=1');
     } catch (err: any) {
-      setError(err?.message || 'Ошибка загрузки');
+      console.error('[author/upload] submit error', err);
+      setError(err?.message || 'Ошибка загрузки. Попробуйте ещё раз.');
     } finally {
       setSubmitting(false);
     }
@@ -475,7 +469,7 @@ export default function UploadWizardPage() {
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                disabled={!rightsConfirmed || !title.trim() || (contentType !== 'SHEET_ONLY' && !audioFile) || (contentType === 'COVER' && !originalComposer.trim())}
+                disabled={!rightsConfirmed}
                 className="px-8 py-3 rounded-full bg-[var(--text-primary)] text-white font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity">
                 Дальше
               </button>
