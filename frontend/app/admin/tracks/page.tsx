@@ -247,20 +247,30 @@ export default function TracksPage() {
     if (playingTrackId === track.id) {
       audioRef.current.pause();
       setPlayingTrackId(null);
-    } else {
-      const audioUrl = track.audioUrl.startsWith('http') 
-        ? track.audioUrl 
-        : `https://sonatum-music.ru${track.audioUrl}`;
-      
-      console.log('[PLAYER] Attempting to play:', audioUrl);
-      
-      audioRef.current.src = audioUrl;
-      audioRef.current.play().catch(err => {
-        console.error('[PLAYER] Error playing audio:', err);
-        alert(`Не удалось воспроизвести трек.\nURL: ${audioUrl}`);
-      });
-      setPlayingTrackId(track.id);
+      return;
     }
+
+    if (!track.audioUrl) {
+      alert(
+        `У трека "${track.title}" не привязан аудиофайл (audioUrl пустой).\n\n` +
+        `Откройте трек на редактирование (карандашик) и укажите правильный URL,\n` +
+        `или удалите запись и попросите автора перезагрузить.`
+      );
+      return;
+    }
+
+    const audioUrl = track.audioUrl.startsWith('http')
+      ? track.audioUrl
+      : `${window.location.origin}${track.audioUrl}`;
+
+    console.log('[PLAYER] Attempting to play:', audioUrl);
+
+    audioRef.current.src = audioUrl;
+    audioRef.current.play().catch(err => {
+      console.error('[PLAYER] Error playing audio:', err);
+      alert(`Не удалось воспроизвести трек.\nURL: ${audioUrl}\n\nОшибка: ${err?.message || err}`);
+    });
+    setPlayingTrackId(track.id);
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {

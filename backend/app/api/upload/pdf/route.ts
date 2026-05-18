@@ -21,8 +21,13 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await savePdfFile(file.buffer, file.filename, slug);
-
-    return NextResponse.json({ success: true, data: result });
+    const url = (result as any).pdfUrl || (result as any).url;
+    return NextResponse.json({
+      success: true,
+      pdfUrl: url,
+      url,
+      data: { ...result, url, pdfUrl: url }
+    });
   } catch (error) {
     console.error('[UPLOAD PDF API] Error:', error);
     return NextResponse.json({ success: false, error: 'Upload failed' }, { status: 500 });

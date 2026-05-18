@@ -67,9 +67,16 @@ export async function POST(req: NextRequest) {
     console.error(`[${timestamp}] [UPLOAD API] [${requestId}] Result:`, result);
     console.error('='.repeat(100));
 
-    return NextResponse.json({ 
-      success: true, 
-      data: result 
+    // Возвращаем URL под несколькими ключами на разных уровнях,
+    // чтобы поддержать любую версию клиента (включая закешированные старые чанки):
+    //   aj.data.audioUrl  — основной
+    //   aj.data.url       — fallback
+    //   aj.audioUrl, aj.url — top-level дубль
+    return NextResponse.json({
+      success: true,
+      audioUrl: result.audioUrl,
+      url: result.audioUrl,
+      data: { ...result, url: result.audioUrl }
     });
 
   } catch (error) {

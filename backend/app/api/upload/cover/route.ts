@@ -52,9 +52,12 @@ export async function POST(req: NextRequest) {
     console.error(`[${timestamp}] [UPLOAD COVER API] [${requestId}] ✅ COVER UPLOAD COMPLETE!`);
     console.error('='.repeat(100));
 
-    return NextResponse.json({ 
-      success: true, 
-      data: result 
+    const url = (result as any).coverUrl || (result as any).url;
+    return NextResponse.json({
+      success: true,
+      coverUrl: url,
+      url,
+      data: { ...result, url, coverUrl: url }
     });
 
   } catch (error) {
