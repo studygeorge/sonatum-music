@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toast } from '@/app/admin/lib/toast';
 import { X } from 'lucide-react';
 
 interface Genre {
@@ -70,7 +71,7 @@ export default function EditGenreModal({ isOpen, genre, onClose, onSubmit }: Edi
 
   const handleSubmit = async () => {
     if (!genre || !formData.name.trim() || !formData.slug.trim()) {
-      alert('Название и slug обязательны');
+      toast('Название и slug обязательны', 'error');
       return;
     }
 

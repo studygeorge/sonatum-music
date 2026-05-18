@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toast } from '@/app/admin/lib/toast';
 import { X } from 'lucide-react';
 import AvatarUploader from '@/app/admin/components/AvatarUploader';
 
@@ -71,7 +72,7 @@ export default function EditArtistModal({
 
   const handleSubmit = async () => {
     if (!artist || !formData.name || !formData.slug) {
-      alert('Заполните обязательные поля');
+      toast('Заполните обязательные поля', 'error');
       return;
     }
 

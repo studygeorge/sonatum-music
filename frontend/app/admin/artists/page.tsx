@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { toast } from '@/app/admin/lib/toast';
 import { adminApi } from '@/app/lib/adminApi';
 import { Search, Mic2, CheckCircle, Plus, Edit2, Trash2, Eye, RefreshCw, Loader } from 'lucide-react';
 
@@ -143,10 +144,10 @@ export default function ArtistsPage() {
     const response = await adminApi.artists.create(formData);
 
     if (response.success) {
-      alert('Артист успешно создан');
+      toast('Артист успешно создан', 'success');
       await loadInitialArtists();
     } else {
-      alert('Ошибка создания артиста: ' + response.error);
+      toast('Ошибка создания артиста: ' + response.error, 'error');
     }
   };
 
@@ -155,10 +156,10 @@ export default function ArtistsPage() {
     const response = await adminApi.artists.update(artistId, formData);
 
     if (response.success) {
-      alert('Артист успешно обновлён');
+      toast('Артист успешно обновлён', 'success');
       await loadInitialArtists();
     } else {
-      alert('Ошибка обновления артиста: ' + response.error);
+      toast('Ошибка обновления артиста: ' + response.error, 'error');
     }
   };
 
@@ -206,13 +207,13 @@ export default function ArtistsPage() {
         }
       }
 
-      alert(`Удалено: ${successCount} артистов${failCount > 0 ? `\nОшибок: ${failCount}` : ''}`);
+      toast(`Удалено: ${successCount} артистов${failCount > 0 ? `\nОшибок: ${failCount}` : ''}`, 'success');
       setSelectedArtists(new Set());
       setShowDeleteConfirm(false);
       await loadInitialArtists();
     } catch (error) {
       console.error('Error deleting artists:', error);
-      alert('Произошла ошибка при удалении артистов');
+      toast('Произошла ошибка при удалении артистов', 'error');
     }
   };
 

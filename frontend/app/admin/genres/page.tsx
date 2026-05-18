@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toast } from '@/app/admin/lib/toast';
 import { adminApi } from '@/app/lib/adminApi';
 import { Search, ChevronLeft, ChevronRight, Plus, Edit2, Trash2, Music2 } from 'lucide-react';
 import CreateGenreModal from './components/CreateGenreModal';
@@ -69,7 +70,7 @@ export default function GenresPage() {
     if (result.success) {
       loadGenres();
     } else {
-      alert(result.error || 'Ошибка создания жанра');
+      toast(result.error || 'Ошибка создания жанра', 'error');
       throw new Error(result.error);
     }
   };
@@ -79,7 +80,7 @@ export default function GenresPage() {
     if (result.success) {
       loadGenres();
     } else {
-      alert(result.error || 'Ошибка обновления жанра');
+      toast(result.error || 'Ошибка обновления жанра', 'error');
       throw new Error(result.error);
     }
   };
@@ -101,11 +102,11 @@ export default function GenresPage() {
         loadGenres();
       } else {
         console.error('[GENRES PAGE] Delete failed:', result.error);
-        alert(result.error || 'Ошибка удаления жанра');
+        toast(result.error || 'Ошибка удаления жанра', 'error');
       }
     } catch (error: any) {
       console.error('[GENRES PAGE] Delete exception:', error);
-      alert('Произошла ошибка при удалении жанра');
+      toast('Произошла ошибка при удалении жанра', 'error');
     }
   };
 

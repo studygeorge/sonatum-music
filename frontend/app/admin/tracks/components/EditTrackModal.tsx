@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toast } from '@/app/admin/lib/toast';
 import { X } from 'lucide-react';
 import AudioUploader from '@/app/admin/components/AudioUploader';
 import CoverUploader from '@/app/admin/components/CoverUploader';
@@ -117,7 +118,7 @@ export default function EditTrackModal({
 
   const handleSubmit = async () => {
     if (!track || !formData.title || !formData.audioUrl || !formData.artistId) {
-      alert('Заполните обязательные поля');
+      toast('Заполните обязательные поля', 'error');
       return;
     }
 

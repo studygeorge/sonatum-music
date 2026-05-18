@@ -89,7 +89,6 @@ export default function UsersPage() {
   };
 
   const handleDelete = async (userId: string) => {
-    if (!confirm('Вы уверены что хотите удалить этого пользователя?')) return;
 
     try {
       const response = await adminApi.users.delete(userId);

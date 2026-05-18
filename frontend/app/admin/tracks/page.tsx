@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { toast } from '@/app/admin/lib/toast';
 import { adminApi } from '@/app/lib/adminApi';
 import { Search, CheckCircle, XCircle, ChevronLeft, ChevronRight, Music, Plus, X, Play, Pause, Volume2, VolumeX, RefreshCw, Edit2, Trash2, Loader } from 'lucide-react';
 
@@ -252,7 +253,7 @@ export default function TracksPage() {
     }
 
     if (!track.audioUrl) {
-      alert(
+      toast(
         `У трека "${track.title}" не привязан аудиофайл (audioUrl пустой).\n\n` +
         `Откройте трек на редактирование (карандашик) и укажите правильный URL,\n` +
         `или удалите запись и попросите автора перезагрузить.`
@@ -269,7 +270,7 @@ export default function TracksPage() {
     audioRef.current.src = audioUrl;
     audioRef.current.play().catch(err => {
       console.error('[PLAYER] Error playing audio:', err);
-      alert(`Не удалось воспроизвести трек.\nURL: ${audioUrl}\n\nОшибка: ${err?.message || err}`);
+      toast(`Не удалось воспроизвести трек.\nURL: ${audioUrl}\n\nОшибка: ${err?.message || err}`, 'error');
     });
     setPlayingTrackId(track.id);
   };
@@ -299,10 +300,10 @@ export default function TracksPage() {
     const response = await adminApi.tracks.create(formData);
 
     if (response.success) {
-      alert('Трек успешно создан');
+      toast('Трек успешно создан', 'success');
       await loadInitialTracks();
     } else {
-      alert('Ошибка создания трека: ' + response.error);
+      toast('Ошибка создания трека: ' + response.error, 'error');
     }
   };
 
@@ -311,29 +312,28 @@ export default function TracksPage() {
     const response = await adminApi.tracks.update(trackId, formData);
 
     if (response.success) {
-      alert('Трек успешно обновлён');
+      toast('Трек успешно обновлён', 'success');
       await loadInitialTracks();
     } else {
-      alert('Ошибка обновления трека: ' + response.error);
+      toast('Ошибка обновления трека: ' + response.error, 'error');
     }
   };
 
   // Одобрение трека
   const handleApprove = async (trackId: string) => {
-    if (!confirm('Одобрить этот трек для публикации?')) return;
 
     try {
       const response = await adminApi.tracks.approve(trackId);
       
       if (response.success) {
-        alert('Трек успешно одобрен');
+        toast('Трек успешно одобрен', 'success');
         loadInitialTracks();
       } else {
-        alert('Ошибка: ' + response.error);
+        toast('Ошибка: ' + response.error, 'error');
       }
     } catch (error) {
       console.error('Error approving track:', error);
-      alert('Произошла ошибка при одобрении трека');
+      toast('Произошла ошибка при одобрении трека', 'error');
     }
   };
 
@@ -342,10 +342,10 @@ export default function TracksPage() {
     const response = await adminApi.tracks.reject(trackId, reason);
     
     if (response.success) {
-      alert('Трек отклонён');
+      toast('Трек отклонён');
       loadInitialTracks();
     } else {
-      alert('Ошибка: ' + response.error);
+      toast('Ошибка: ' + response.error, 'error');
     }
   };
 
@@ -393,13 +393,13 @@ export default function TracksPage() {
         }
       }
 
-      alert(`Удалено: ${successCount} треков${failCount > 0 ? `\nОшибок: ${failCount}` : ''}`);
+      toast(`Удалено: ${successCount} треков${failCount > 0 ? `\nОшибок: ${failCount}` : ''}`, 'success');
       setSelectedTracks(new Set());
       setShowDeleteConfirm(false);
       await loadInitialTracks();
     } catch (error) {
       console.error('Error deleting tracks:', error);
-      alert('Произошла ошибка при удалении треков');
+      toast('Произошла ошибка при удалении треков', 'error');
     }
   };
 

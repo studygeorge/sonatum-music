@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toast } from '@/app/admin/lib/toast';
 import { X } from 'lucide-react';
 
 interface Track {
@@ -29,7 +30,7 @@ export default function RejectTrackModal({
 
   const handleSubmit = async () => {
     if (!track || !reason.trim()) {
-      alert('Укажите причину отклонения');
+      toast('Укажите причину отклонения', 'success');
       return;
     }
 
