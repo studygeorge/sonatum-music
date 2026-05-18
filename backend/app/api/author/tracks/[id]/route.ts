@@ -154,7 +154,7 @@ export async function PATCH(
          tempo = COALESCE($9, tempo),
          allow_donations = COALESCE($10, allow_donations),
          allow_exclusive = COALESCE($11, allow_exclusive),
-         updated_at = now()
+         "updatedAt" = now()
        WHERE id = $12`,
       body.contentType || null,
       body.originalComposer || null,

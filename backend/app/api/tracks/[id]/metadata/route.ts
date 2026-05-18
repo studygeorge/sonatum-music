@@ -77,7 +77,7 @@ export async function PATCH(
        rights_confirmed = COALESCE($13, rights_confirmed),
        allow_donations = COALESCE($14, allow_donations),
        allow_exclusive = COALESCE($15, allow_exclusive),
-       updated_at = now()
+       "updatedAt" = now()
      WHERE id = $16`,
     body.contentType || null,
     body.originalComposer || null,
