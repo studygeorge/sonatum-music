@@ -14,6 +14,7 @@ type Track = {
   duration: number;
   audioUrl: string;
   price: any;
+  instrumentalPrice?: any;
   isForSale: boolean;
   isFree: boolean;
   playCount: number;
@@ -22,13 +23,18 @@ type Track = {
   status: string;
   createdAt: string;
   releaseDate: string | null;
+  lyrics?: string | null;
+  bpm?: number | null;
+  key?: string | null;
 };
 
-const STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  DRAFT: { label: 'Черновик', color: 'bg-gray-100 text-gray-700' },
-  PENDING: { label: 'На модерации', color: 'bg-amber-100 text-amber-700' },
-  PUBLISHED: { label: 'Опубликовано', color: 'bg-green-100 text-green-700' },
-  REJECTED: { label: 'Отклонено', color: 'bg-red-100 text-red-700' },
+// Монохромные статусы — никаких зелёных/красных/жёлтых.
+const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
+  DRAFT: { label: 'Черновик', cls: 'bg-gray-100 text-gray-700 border border-gray-200' },
+  PENDING: { label: 'На модерации', cls: 'bg-gray-700 text-white' },
+  PUBLISHED: { label: 'Опубликован', cls: 'bg-black text-white' },
+  REJECTED: { label: 'Отклонён', cls: 'bg-white text-black border-2 border-black' },
+  ARCHIVED: { label: 'В архиве', cls: 'bg-gray-200 text-gray-500' },
 };
 
 function fmtDuration(s: number) {
@@ -42,9 +48,10 @@ function AuthorTracksPageInner() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'ALL' | 'PUBLISHED' | 'PENDING' | 'DRAFT' | 'REJECTED'>('ALL');
+  const [editing, setEditing] = useState<Track | null>(null);
   const justUploaded = sp.get('uploaded') === '1';
 
-  useEffect(() => {
+  const load = () => {
     fetch('/api/author/tracks', {
       headers: { Authorization: `Bearer ${authStorage.getToken() || ''}` },
     })
@@ -53,45 +60,56 @@ function AuthorTracksPageInner() {
         if (j.success) setTracks(j.data || []);
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
   }, []);
 
   const filtered = tracks.filter((t) => filter === 'ALL' || t.status === filter);
 
+  const onSaved = (updated: Track) => {
+    setTracks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
+    setEditing(null);
+  };
+  const onDeleted = (id: string) => {
+    setTracks((prev) => prev.filter((t) => t.id !== id));
+    setEditing(null);
+  };
+
   return (
     <div className="space-y-6 animate-fadeInUp">
       {justUploaded && (
-        <div className="apple-card p-4 bg-green-50 border-green-200 text-sm text-green-800">
+        <div className="apple-card p-4 bg-gray-50 border border-gray-200 text-sm text-gray-900">
           Трек отправлен на модерацию. После проверки он появится в каталоге.
         </div>
       )}
 
       <section
-        className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white flex items-end justify-between gap-4"
-        style={{
-          background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)',
-        }}>
+        className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white flex items-end justify-between gap-4 bg-gray-900">
         <div className="relative z-10 max-w-xl">
-          <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-90">
+          <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-80">
             Дискография
           </div>
           <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white">Мои треки</h1>
-          <p className="text-sm md:text-base text-white/85 mt-2">
+          <p className="text-sm md:text-base text-white/75 mt-2">
             Всего: {tracks.length}
           </p>
         </div>
         <Link
           href="/author/upload"
-          className="px-5 py-3 rounded-full bg-white text-[#1d4cb8] font-semibold text-sm whitespace-nowrap shrink-0 hover:opacity-90 transition-opacity">
+          className="px-5 py-3 rounded-full bg-white text-gray-900 font-semibold text-sm whitespace-nowrap shrink-0 hover:bg-gray-100 transition-colors">
           + Загрузить
         </Link>
       </section>
+
       <div className="flex gap-2 overflow-x-auto pb-1">
         {[
           { v: 'ALL', l: `Все · ${tracks.length}` },
-          { v: 'PUBLISHED', l: `Опубликовано · ${tracks.filter(t => t.status === 'PUBLISHED').length}` },
+          { v: 'PUBLISHED', l: `Опубликован · ${tracks.filter(t => t.status === 'PUBLISHED').length}` },
           { v: 'PENDING', l: `На модерации · ${tracks.filter(t => t.status === 'PENDING').length}` },
           { v: 'DRAFT', l: `Черновики · ${tracks.filter(t => t.status === 'DRAFT').length}` },
-          { v: 'REJECTED', l: `Отклонено · ${tracks.filter(t => t.status === 'REJECTED').length}` },
+          { v: 'REJECTED', l: `Отклонён · ${tracks.filter(t => t.status === 'REJECTED').length}` },
         ].map((f) => (
           <button
             key={f.v}
@@ -105,11 +123,12 @@ function AuthorTracksPageInner() {
           </button>
         ))}
       </div>
+
       {loading ? (
         <div className="text-center text-[var(--text-secondary)] py-12">Загрузка…</div>
       ) : filtered.length === 0 ? (
         <div className="apple-card p-12 text-center">
-                    <h3 className="font-semibold mb-1">Пока ничего</h3>
+          <h3 className="font-semibold mb-1">Пока ничего</h3>
           <p className="text-sm text-[var(--text-secondary)] mb-5">
             Загрузите первый трек, чтобы начать продавать лицензии и получать роялти.
           </p>
@@ -124,16 +143,20 @@ function AuthorTracksPageInner() {
           {filtered.map((t) => {
             const s = STATUS_LABEL[t.status] || STATUS_LABEL.DRAFT;
             return (
-              <div key={t.id} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--hover)] transition-colors border-b border-[var(--border)] last:border-b-0">
-                <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden shrink-0">
-                  {t.cover && (
+              <div
+                key={t.id}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--hover)] transition-colors border-b border-[var(--border)] last:border-b-0">
+                <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center text-sm font-bold text-gray-400">
+                  {t.cover ? (
                     <img src={t.cover} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{(t.title || '?').trim()[0]?.toUpperCase() || '?'}</span>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold truncate">{t.title}</span>
-                    <span className={`text-[11px] px-2 py-0.5 rounded-full ${s.color} shrink-0`}>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ${s.cls}`}>
                       {s.label}
                     </span>
                   </div>
@@ -141,21 +164,263 @@ function AuthorTracksPageInner() {
                     <span>{fmtDuration(t.duration)}</span>
                     <span>· {t.playCount.toLocaleString('ru-RU')} прослушиваний</span>
                     <span>· {t.purchaseCount} продаж</span>
-                    {t.price && Number(t.price)> 0 && (
+                    {t.price && Number(t.price) > 0 && (
                       <span>· {Number(t.price).toLocaleString('ru-RU')} ₽</span>
                     )}
                   </div>
                 </div>
-                <Link
-                  href={`/tracks/${t.slug}`}
-                  className="text-sm text-[var(--accent)] hover:underline shrink-0 hidden sm:block">
-                  Открыть
-                </Link>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => setEditing(t)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 text-gray-900 hover:bg-gray-200 transition-colors">
+                    Редактировать
+                  </button>
+                  <Link
+                    href={`/tracks/${t.slug}`}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors hidden sm:inline-block">
+                    Открыть
+                  </Link>
+                </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {editing && (
+        <EditTrackDialog
+          track={editing}
+          onClose={() => setEditing(null)}
+          onSaved={onSaved}
+          onDeleted={onDeleted}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditTrackDialog({
+  track,
+  onClose,
+  onSaved,
+  onDeleted,
+}: {
+  track: Track;
+  onClose: () => void;
+  onSaved: (t: Track) => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [title, setTitle] = useState(track.title || '');
+  const [lyrics, setLyrics] = useState(track.lyrics || '');
+  const [price, setPrice] = useState<string>(track.price ? String(track.price) : '');
+  const [instrumentalPrice, setInstrumentalPrice] = useState<string>(
+    track.instrumentalPrice ? String(track.instrumentalPrice) : ''
+  );
+  const [isForSale, setIsForSale] = useState(!!track.isForSale);
+  const [isFree, setIsFree] = useState(!!track.isFree);
+  const [cover, setCover] = useState(track.cover || '');
+  const [bpm, setBpm] = useState<string>(track.bpm ? String(track.bpm) : '');
+  const [musKey, setMusKey] = useState(track.key || '');
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const r = await fetch(`/api/author/tracks/${track.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authStorage.getToken() || ''}`,
+        },
+        body: JSON.stringify({
+          title,
+          lyrics,
+          cover,
+          price,
+          instrumentalPrice,
+          isForSale,
+          isFree,
+          bpm,
+          key: musKey,
+        }),
+      });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error || 'Ошибка сохранения');
+      onSaved(j.data);
+    } catch (e: any) {
+      setError(e?.message || 'Ошибка сохранения');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async () => {
+    setDeleting(true);
+    try {
+      const r = await fetch(`/api/author/tracks/${track.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${authStorage.getToken() || ''}` },
+      });
+      const j = await r.json();
+      if (j.success) {
+        onDeleted(track.id);
+      } else {
+        setError(j.error || 'Не удалось удалить');
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ inset: 0 }}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="bg-white rounded-2xl w-full max-w-xl relative z-10 shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+          <h2 className="text-lg font-bold text-gray-900">Редактирование трека</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-900 text-2xl leading-none">×</button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {track.status === 'PUBLISHED' && (
+            <div className="text-xs bg-gray-100 border border-gray-200 rounded-lg p-3 text-gray-700">
+              После сохранения трек будет отправлен на повторную модерацию.
+            </div>
+          )}
+          {error && (
+            <div className="text-sm bg-white border-2 border-black rounded-lg p-3 text-black">{error}</div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Название</label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Цена (₽)</label>
+              <input
+                type="number"
+                min="0"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="не продаётся"
+                className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Цена минусовки (₽)</label>
+              <input
+                type="number"
+                min="0"
+                value={instrumentalPrice}
+                onChange={(e) => setInstrumentalPrice(e.target.value)}
+                placeholder="нет минусовки"
+                className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">BPM</label>
+              <input
+                type="number"
+                value={bpm}
+                onChange={(e) => setBpm(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Тональность</label>
+              <input
+                value={musKey}
+                onChange={(e) => setMusKey(e.target.value)}
+                placeholder="C, G♭, Am..."
+                className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">URL обложки</label>
+            <input
+              value={cover}
+              onChange={(e) => setCover(e.target.value)}
+              placeholder="/images/cover.jpg или https://..."
+              className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Текст</label>
+            <textarea
+              value={lyrics}
+              onChange={(e) => setLyrics(e.target.value)}
+              rows={6}
+              className="w-full px-3 py-2 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none resize-none"
+            />
+          </div>
+
+          <div className="flex gap-4 flex-wrap">
+            <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
+              <input type="checkbox" checked={isForSale} onChange={(e) => setIsForSale(e.target.checked)} className="accent-black" />
+              Продаётся
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
+              <input type="checkbox" checked={isFree} onChange={(e) => setIsFree(e.target.checked)} className="accent-black" />
+              Бесплатно
+            </label>
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between rounded-b-2xl">
+          {confirmDelete ? (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-gray-700">Удалить трек насовсем?</span>
+              <button
+                onClick={remove}
+                disabled={deleting}
+                className="px-3 py-1.5 rounded-lg bg-black text-white text-sm font-medium hover:bg-gray-800 disabled:opacity-50">
+                Удалить
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-900 text-sm font-medium hover:bg-gray-200">
+                Отмена
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="text-sm text-gray-500 hover:text-black underline underline-offset-2">
+              Удалить трек
+            </button>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="px-5 py-2 rounded-full bg-gray-100 text-gray-900 font-medium hover:bg-gray-200 transition-colors">
+              Отмена
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="px-6 py-2 rounded-full bg-black text-white font-medium hover:bg-gray-800 transition-colors disabled:opacity-50">
+              {saving ? 'Сохраняем…' : 'Сохранить'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
