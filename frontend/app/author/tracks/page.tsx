@@ -225,6 +225,25 @@ function AuthorTracksPageInner() {
   );
 }
 
+type FullTrack = Track & {
+  contentType?: string | null;
+  originalComposer?: string | null;
+  recordingYear?: number | null;
+  recordingPlace?: string | null;
+  era?: string | null;
+  mood?: string | null;
+  instruments?: any;
+  difficulty?: string | null;
+  tempo?: string | null;
+  hasMinus?: boolean | null;
+  minusAudioUrl?: string | null;
+  minusPrice?: number | null;
+  allowDonations?: boolean | null;
+  allowExclusive?: boolean | null;
+  sheetUrl?: string | null;
+  instrumentalUrl?: string | null;
+};
+
 function EditTrackInline({
   track,
   onSaved,
@@ -236,43 +255,192 @@ function EditTrackInline({
   onDeleted: (id: string) => void;
   onClose: () => void;
 }) {
+  // Загружаем полные данные по треку (включая V2-поля и ноты)
+  const [data, setData] = useState<FullTrack | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Поля
   const [title, setTitle] = useState(track.title || '');
-  const [lyrics, setLyrics] = useState(track.lyrics || '');
-  const [price, setPrice] = useState<string>(track.price ? String(track.price) : '');
-  const [instrumentalPrice, setInstrumentalPrice] = useState<string>(
-    track.instrumentalPrice ? String(track.instrumentalPrice) : ''
-  );
-  const [isForSale, setIsForSale] = useState(!!track.isForSale);
-  const [isFree, setIsFree] = useState(!!track.isFree);
-  const [cover, setCover] = useState(track.cover || '');
-  const [bpm, setBpm] = useState<string>(track.bpm ? String(track.bpm) : '');
-  const [musKey, setMusKey] = useState(track.key || '');
+  const [lyrics, setLyrics] = useState('');
+  const [price, setPrice] = useState<string>('');
+  const [instrumentalPrice, setInstrumentalPrice] = useState<string>('');
+  const [isForSale, setIsForSale] = useState(false);
+  const [isFree, setIsFree] = useState(false);
+  const [cover, setCover] = useState('');
+  const [bpm, setBpm] = useState<string>('');
+  const [musKey, setMusKey] = useState('');
+  const [audioUrl, setAudioUrl] = useState('');
+  const [instrumentalUrl, setInstrumentalUrl] = useState('');
+  const [sheetUrl, setSheetUrl] = useState('');
+  const [era, setEra] = useState('');
+  const [mood, setMood] = useState('');
+  const [instruments, setInstruments] = useState('');
+  const [difficulty, setDifficulty] = useState('');
+  const [tempo, setTempo] = useState('');
+  const [recordingPlace, setRecordingPlace] = useState('');
+  const [recordingYear, setRecordingYear] = useState<string>('');
+  const [originalComposer, setOriginalComposer] = useState('');
+  const [allowDonations, setAllowDonations] = useState(true);
+  const [allowExclusive, setAllowExclusive] = useState(false);
+
+  // Состояния загрузки файлов
+  const [uploadingAudio, setUploadingAudio] = useState(false);
+  const [uploadingMinus, setUploadingMinus] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // Подгрузить полные данные
+  useEffect(() => {
+    fetch(`/api/author/tracks/${track.id}`, {
+      headers: { Authorization: `Bearer ${authStorage.getToken() || ''}` },
+    })
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success && j.data) {
+          const d = j.data as FullTrack;
+          setData(d);
+          setTitle(d.title || '');
+          setLyrics(d.lyrics || '');
+          setPrice(d.price ? String(d.price) : '');
+          setInstrumentalPrice(d.instrumentalPrice ? String(d.instrumentalPrice) : '');
+          setIsForSale(!!d.isForSale);
+          setIsFree(!!d.isFree);
+          setCover(d.cover || '');
+          setBpm(d.bpm ? String(d.bpm) : '');
+          setMusKey(d.key || '');
+          setAudioUrl(d.audioUrl || '');
+          setInstrumentalUrl(d.instrumentalUrl || d.minusAudioUrl || '');
+          setSheetUrl(d.sheetUrl || '');
+          setEra(d.era || '');
+          setMood(d.mood || '');
+          setInstruments(Array.isArray(d.instruments) ? d.instruments.join(', ') : (d.instruments || ''));
+          setDifficulty(d.difficulty || '');
+          setTempo(d.tempo || '');
+          setRecordingPlace(d.recordingPlace || '');
+          setRecordingYear(d.recordingYear ? String(d.recordingYear) : '');
+          setOriginalComposer(d.originalComposer || '');
+          setAllowDonations(d.allowDonations ?? true);
+          setAllowExclusive(!!d.allowExclusive);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [track.id]);
+
+  // Артист-слаг из URL аудио (для генерации имени файла при upload)
+  const artistSlug = (audioUrl.match(/\/audio\/tracks\/([^/]+)\//) || [, 'unknown'])[1];
+  const trackSlug = track.slug || 'track';
+
+  const uploadFile = async (
+    file: File,
+    endpoint: string,
+    extra: Record<string, string> = {}
+  ): Promise<string | null> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('artistSlug', artistSlug);
+    fd.append('trackSlug', trackSlug);
+    Object.entries(extra).forEach(([k, v]) => fd.append(k, v));
+    const r = await fetch(endpoint, { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error || 'Ошибка загрузки');
+    return j.data?.audioUrl || j.data?.coverUrl || j.data?.pdfUrl || j.data?.url || j.audioUrl || j.coverUrl || j.pdfUrl || j.url || null;
+  };
+
+  const onAudioFile = async (f: File | null) => {
+    if (!f) return;
+    setUploadingAudio(true);
+    setError('');
+    try {
+      const url = await uploadFile(f, '/api/upload/audio');
+      if (url) setAudioUrl(url);
+    } catch (e: any) {
+      setError(e?.message || 'Ошибка загрузки аудио');
+    } finally {
+      setUploadingAudio(false);
+    }
+  };
+  const onMinusFile = async (f: File | null) => {
+    if (!f) return;
+    setUploadingMinus(true);
+    setError('');
+    try {
+      const url = await uploadFile(f, '/api/upload/audio', { kind: 'instrumental' });
+      if (url) setInstrumentalUrl(url);
+    } catch (e: any) {
+      setError(e?.message || 'Ошибка загрузки минусовки');
+    } finally {
+      setUploadingMinus(false);
+    }
+  };
+  const onCoverFile = async (f: File | null) => {
+    if (!f) return;
+    setUploadingCover(true);
+    setError('');
+    try {
+      const url = await uploadFile(f, '/api/upload/cover');
+      if (url) setCover(url);
+    } catch (e: any) {
+      setError(e?.message || 'Ошибка загрузки обложки');
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+  const onPdfFile = async (f: File | null) => {
+    if (!f) return;
+    setUploadingPdf(true);
+    setError('');
+    try {
+      const url = await uploadFile(f, '/api/upload/pdf');
+      if (url) setSheetUrl(url);
+    } catch (e: any) {
+      setError(e?.message || 'Ошибка загрузки PDF');
+    } finally {
+      setUploadingPdf(false);
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     setError('');
     try {
+      const payload: any = {
+        title,
+        lyrics,
+        cover,
+        price,
+        instrumentalPrice,
+        isForSale,
+        isFree,
+        bpm,
+        key: musKey,
+        audioUrl,
+        instrumentalUrl,
+        sheetUrl,
+        era,
+        mood,
+        instruments: instruments
+          ? instruments.split(',').map((s) => s.trim()).filter(Boolean)
+          : null,
+        difficulty,
+        tempo,
+        recordingPlace,
+        recordingYear: recordingYear ? Number(recordingYear) : null,
+        originalComposer,
+        allowDonations,
+        allowExclusive,
+      };
       const r = await fetch(`/api/author/tracks/${track.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${authStorage.getToken() || ''}`,
         },
-        body: JSON.stringify({
-          title,
-          lyrics,
-          cover,
-          price,
-          instrumentalPrice,
-          isForSale,
-          isFree,
-          bpm,
-          key: musKey,
-        }),
+        body: JSON.stringify(payload),
       });
       const j = await r.json();
       if (!j.success) throw new Error(j.error || 'Ошибка сохранения');
@@ -302,8 +470,18 @@ function EditTrackInline({
     }
   };
 
+  if (loading) {
+    return (
+      <div className="bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-8 text-center text-sm text-gray-500">
+        Загрузка данных трека…
+      </div>
+    );
+  }
+
+  const inputCls = 'w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none';
+
   return (
-    <div className="bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-5 space-y-4">
+    <div className="bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-5 space-y-6">
       {track.status === 'PUBLISHED' && (
         <div className="text-xs bg-white border border-gray-200 rounded-lg p-3 text-gray-700">
           После сохранения трек будет отправлен на повторную модерацию.
@@ -313,102 +491,192 @@ function EditTrackInline({
         <div className="text-sm bg-white border-2 border-black rounded-lg p-3 text-black">{error}</div>
       )}
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Название</label>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+      {/* ФАЙЛЫ */}
+      <section className="space-y-3">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-700">Файлы</h3>
+
+        <FileRow
+          label="Основное аудио"
+          currentUrl={audioUrl}
+          uploading={uploadingAudio}
+          accept="audio/*"
+          onFile={onAudioFile}
+          onClear={() => setAudioUrl('')}
         />
-      </div>
+        <FileRow
+          label="Минусовка"
+          currentUrl={instrumentalUrl}
+          uploading={uploadingMinus}
+          accept="audio/*"
+          onFile={onMinusFile}
+          onClear={() => setInstrumentalUrl('')}
+        />
+        <FileRow
+          label="Обложка"
+          currentUrl={cover}
+          uploading={uploadingCover}
+          accept="image/*"
+          onFile={onCoverFile}
+          onClear={() => setCover('')}
+          preview
+        />
+        <FileRow
+          label="Ноты (PDF)"
+          currentUrl={sheetUrl}
+          uploading={uploadingPdf}
+          accept="application/pdf"
+          onFile={onPdfFile}
+          onClear={() => setSheetUrl('')}
+        />
+      </section>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* ОСНОВНОЕ */}
+      <section className="space-y-3">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-700">Основное</h3>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Цена основной версии (₽)</label>
-          <input
-            type="number"
-            min="0"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            placeholder="не продаётся"
-            className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
-          />
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Название</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Год записи</label>
+            <input
+              type="number"
+              value={recordingYear}
+              onChange={(e) => setRecordingYear(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Место записи</label>
+            <input value={recordingPlace} onChange={(e) => setRecordingPlace(e.target.value)} className={inputCls} />
+          </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Цена минусовки (₽)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            Автор оригинала (для кавера)
+          </label>
           <input
-            type="number"
-            min="0"
-            value={instrumentalPrice}
-            onChange={(e) => setInstrumentalPrice(e.target.value)}
-            placeholder="нет минусовки"
-            className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+            value={originalComposer}
+            onChange={(e) => setOriginalComposer(e.target.value)}
+            placeholder="оставьте пустым, если это ваше оригинальное произведение"
+            className={inputCls}
           />
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* МЕТАДАННЫЕ */}
+      <section className="space-y-3">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-700">Метаданные</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Эпоха</label>
+            <input value={era} onChange={(e) => setEra(e.target.value)} className={inputCls} placeholder="Барокко, XX век…" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Настроение</label>
+            <input value={mood} onChange={(e) => setMood(e.target.value)} className={inputCls} placeholder="лирическое, торжественное…" />
+          </div>
+        </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">BPM</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Инструменты (через запятую)</label>
           <input
-            type="number"
-            value={bpm}
-            onChange={(e) => setBpm(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+            value={instruments}
+            onChange={(e) => setInstruments(e.target.value)}
+            className={inputCls}
+            placeholder="фортепиано, скрипка, виолончель"
           />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Сложность</label>
+            <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className={inputCls}>
+              <option value="">—</option>
+              <option value="BEGINNER">Начальный</option>
+              <option value="INTERMEDIATE">Средний</option>
+              <option value="ADVANCED">Продвинутый</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Темп</label>
+            <input value={tempo} onChange={(e) => setTempo(e.target.value)} className={inputCls} placeholder="Allegro, 120 BPM" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">BPM</label>
+            <input
+              type="number"
+              value={bpm}
+              onChange={(e) => setBpm(e.target.value)}
+              className={inputCls}
+            />
+          </div>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Тональность</label>
-          <input
-            value={musKey}
-            onChange={(e) => setMusKey(e.target.value)}
-            placeholder="C, G♭, Am..."
-            className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
-          />
+          <input value={musKey} onChange={(e) => setMusKey(e.target.value)} placeholder="C, G♭, Am…" className={inputCls} />
         </div>
-      </div>
+      </section>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">URL обложки</label>
-        <input
-          value={cover}
-          onChange={(e) => setCover(e.target.value)}
-          placeholder="/images/cover.jpg или https://..."
-          className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">Текст</label>
+      {/* ТЕКСТ */}
+      <section className="space-y-3">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-700">Текст произведения</h3>
         <textarea
           value={lyrics}
           onChange={(e) => setLyrics(e.target.value)}
-          rows={5}
-          className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none resize-none"
+          rows={6}
+          placeholder="Полный текст произведения (для Premium-подписчиков)"
+          className={`${inputCls} resize-none`}
         />
-      </div>
+      </section>
 
-      <div className="flex gap-4 flex-wrap">
-        <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isForSale}
-            onChange={(e) => setIsForSale(e.target.checked)}
-            className="accent-black"
-          />
-          Продаётся
-        </label>
-        <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isFree}
-            onChange={(e) => setIsFree(e.target.checked)}
-            className="accent-black"
-          />
-          Бесплатно
-        </label>
-      </div>
+      {/* МОНЕТИЗАЦИЯ */}
+      <section className="space-y-3">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-gray-700">Монетизация</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Цена основной версии (₽)</label>
+            <input
+              type="number"
+              min="0"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="не продаётся"
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Цена минусовки (₽)</label>
+            <input
+              type="number"
+              min="0"
+              value={instrumentalPrice}
+              onChange={(e) => setInstrumentalPrice(e.target.value)}
+              placeholder="нет минусовки"
+              className={inputCls}
+            />
+          </div>
+        </div>
+        <div className="flex gap-5 flex-wrap pt-1">
+          <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
+            <input type="checkbox" checked={isForSale} onChange={(e) => setIsForSale(e.target.checked)} className="accent-black" />
+            Продаётся
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
+            <input type="checkbox" checked={isFree} onChange={(e) => setIsFree(e.target.checked)} className="accent-black" />
+            Бесплатно
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
+            <input type="checkbox" checked={allowDonations} onChange={(e) => setAllowDonations(e.target.checked)} className="accent-black" />
+            Принимать донаты
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
+            <input type="checkbox" checked={allowExclusive} onChange={(e) => setAllowExclusive(e.target.checked)} className="accent-black" />
+            Эксклюзивная лицензия (по запросу)
+          </label>
+        </div>
+      </section>
 
+      {/* НИЖНИЕ КНОПКИ */}
       <div className="flex items-center justify-between flex-wrap gap-3 pt-3 border-t border-gray-200">
         {confirmDelete ? (
           <div className="flex items-center gap-2 text-sm flex-wrap">
@@ -446,6 +714,68 @@ function EditTrackInline({
             {saving ? 'Сохраняем…' : 'Сохранить'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function FileRow({
+  label,
+  currentUrl,
+  uploading,
+  accept,
+  onFile,
+  onClear,
+  preview = false,
+}: {
+  label: string;
+  currentUrl: string;
+  uploading: boolean;
+  accept: string;
+  onFile: (f: File | null) => void;
+  onClear: () => void;
+  preview?: boolean;
+}) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-3 flex items-center gap-3 flex-wrap">
+      {preview && currentUrl && (
+        <img src={currentUrl} alt="" className="w-12 h-12 rounded-lg object-cover border border-gray-200" />
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-gray-900">{label}</div>
+        {currentUrl ? (
+          <div className="text-xs text-gray-500 truncate" title={currentUrl}>
+            {currentUrl}
+          </div>
+        ) : (
+          <div className="text-xs text-gray-400">не загружено</div>
+        )}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <label
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+            uploading
+              ? 'bg-gray-200 text-gray-500'
+              : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+          }`}>
+          {uploading ? 'Загрузка…' : currentUrl ? 'Заменить' : 'Загрузить'}
+          <input
+            type="file"
+            accept={accept}
+            className="hidden"
+            disabled={uploading}
+            onChange={(e) => onFile(e.target.files?.[0] || null)}
+          />
+        </label>
+        {currentUrl && !uploading && (
+          <button
+            type="button"
+            onClick={onClear}
+            title="Убрать"
+            className="px-2 py-1.5 rounded-lg text-xs text-gray-500 hover:text-black hover:bg-gray-100">
+            ×
+          </button>
+        )}
       </div>
     </div>
   );
