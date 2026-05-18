@@ -45,12 +45,12 @@ const fmtDate = (d: string | null) => {
 };
 
 const STATUS_LABEL: Record<string, { l: string; c: string }> = {
-  PAID: { l: 'Оплачено', c: 'bg-green-100 text-green-700' },
-  PENDING: { l: 'Ожидает', c: 'bg-amber-100 text-amber-700' },
-  ACTIVE: { l: 'Активна', c: 'bg-green-100 text-green-700' },
-  AWAITING_MANAGER: { l: 'У менеджера', c: 'bg-blue-100 text-blue-700' },
-  EXCLUSIVE_REQUESTED: { l: 'Эксклюзив', c: 'bg-purple-100 text-purple-700' },
-  REJECTED: { l: 'Отклонено', c: 'bg-red-100 text-red-700' },
+  PAID: { l: 'Оплачено', c: 'bg-black text-white' },
+  PENDING: { l: 'Ожидает', c: 'bg-gray-700 text-white' },
+  ACTIVE: { l: 'Активна', c: 'bg-black text-white' },
+  AWAITING_MANAGER: { l: 'У менеджера', c: 'bg-gray-200 text-gray-900 border border-gray-300' },
+  EXCLUSIVE_REQUESTED: { l: 'Эксклюзив', c: 'bg-gray-200 text-gray-900 border border-gray-300' },
+  REJECTED: { l: 'Отклонено', c: 'bg-white text-black border-2 border-black' },
 };
 
 const KIND_LABEL: Record<string, string> = {
@@ -156,7 +156,7 @@ export default function AdminFinancePage() {
       </section>
       {/* Ожидающие действий */}
       {(s.b2bPending> 0 || s.exclusivePending> 0) && (
-        <section className="apple-card p-5 md:p-6 bg-amber-50 border-amber-200">
+        <section className="apple-card p-5 md:p-6 bg-gray-50 border border-gray-300">
           <h2 className="text-base font-bold mb-3">Ожидают действий менеджера</h2>
           <div className="flex gap-3 flex-wrap">
             {s.b2bPending> 0 && (
@@ -197,7 +197,7 @@ export default function AdminFinancePage() {
                 <td className="py-2.5 text-right text-[var(--text-secondary)] tabular-nums">{l.commissionPct}%</td>
                 <td className="py-2.5 text-right tabular-nums">{l.sales}</td>
                 <td className="py-2.5 text-right tabular-nums font-medium">{fmtAmount(l.revenue)} ₽</td>
-                <td className="py-2.5 text-right tabular-nums text-green-700">+{fmtAmount(l.commission)} ₽</td>
+                <td className="py-2.5 text-right tabular-nums text-gray-900">+{fmtAmount(l.commission)} ₽</td>
               </tr>
             ))}
           </tbody>
@@ -267,7 +267,7 @@ export default function AdminFinancePage() {
                         <span className={`text-[11px] px-2 py-0.5 rounded-full ${st.c} whitespace-nowrap`}>{st.l}</span>
                       </td>
                       <td className="py-2.5 text-right font-medium tabular-nums">{fmtAmount(t.amount)} ₽</td>
-                      <td className="py-2.5 text-right text-green-700 tabular-nums">
+                      <td className="py-2.5 text-right text-gray-900 tabular-nums">
                         {t.commission> 0 ? `+${fmtAmount(t.commission)} ₽` : '—'}
                       </td>
                       <td className="py-2.5 text-right text-xs text-[var(--text-secondary)] whitespace-nowrap">
@@ -322,7 +322,7 @@ function RevenueCard({
       {count> 0 && (
         <div className="text-[11px] text-[var(--text-secondary)] mb-2">{count} операций</div>
       )}
-      <div className="text-xs text-green-700 tabular-nums">+{fmtAmount(commission)} ₽</div>
+      <div className="text-xs text-gray-900 tabular-nums">+{fmtAmount(commission)} ₽</div>
       <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">{commissionLabel}</div>
     </div>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { X, Music, ExternalLink } from 'lucide-react';
 import { adminApi } from '@/app/lib/adminApi';
+import { ruStatus } from '@/app/admin/lib/labels';
 
 interface Artist {
   id: string;
@@ -163,11 +164,12 @@ export default function ViewTracksModal({
                       <span>{formatDuration(track.duration)}</span>
                       <span>•</span>
                       <span className={`px-2 py-0.5 rounded text-xs ${
-                        track.status === 'PUBLISHED' ? 'bg-[var(--background)] text-[var(--text-secondary)] border border-[var(--border)]' :
-                        track.status === 'PENDING' ? 'bg-[var(--background)] text-[var(--text-secondary)] border border-[var(--border)]' :
-                        'bg-[var(--background)] text-[var(--text-secondary)] border border-[var(--border)]'
+                        track.status === 'PUBLISHED' ? 'bg-black text-white' :
+                        track.status === 'PENDING' ? 'bg-gray-700 text-white' :
+                        track.status === 'REJECTED' ? 'bg-white text-black border border-black' :
+                        'bg-gray-200 text-gray-900'
                       }`}>
-                        {track.status}
+                        {ruStatus(track.status)}
                       </span>
                     </div>
                   </div>
@@ -203,7 +205,7 @@ export default function ViewTracksModal({
             </p>
             <button
               onClick={loadTracks}
-              className="text-sm text-blue-600 hover:text-blue-700 underline"
+              className="text-sm text-gray-900 hover:text-black underline"
             >
               Обновить
             </button>

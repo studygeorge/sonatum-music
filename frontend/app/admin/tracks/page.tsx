@@ -10,6 +10,7 @@ import EditTrackModal from './components/EditTrackModal';
 import RejectTrackModal from './components/RejectTrackModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
 import ArtistDetailDrawer from '../components/ArtistDetailDrawer';
+import { ruStatus } from '@/app/admin/lib/labels';
 
 interface Track {
   id: string;
@@ -587,11 +588,12 @@ export default function TracksPage() {
 
                       <div className="flex items-center gap-2">
                         <span className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap ${
-                          track.status === 'PUBLISHED' ? 'bg-[var(--background)] text-[var(--text-secondary)] border border-[var(--border)]' :
-                          track.status === 'PENDING' ? 'bg-[var(--background)] text-[var(--text-secondary)] border border-[var(--border)]' :
-                          'bg-[var(--background)] text-[var(--text-secondary)] border border-[var(--border)]'
+                          track.status === 'PUBLISHED' ? 'bg-black text-white' :
+                          track.status === 'PENDING' ? 'bg-gray-700 text-white' :
+                          track.status === 'REJECTED' ? 'bg-white text-black border-2 border-black' :
+                          'bg-gray-200 text-gray-900'
                         }`}>
-                          {track.status}
+                          {ruStatus(track.status)}
                         </span>
 
                         <button

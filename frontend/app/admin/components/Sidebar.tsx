@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 const menuItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/admin/dashboard' },
+  { icon: LayoutDashboard, label: 'Главная', href: '/admin/dashboard' },
   { icon: Users, label: 'Пользователи', href: '/admin/users' },
   { icon: Music, label: 'Треки', href: '/admin/tracks' },
   { icon: Mic2, label: 'Артисты', href: '/admin/artists' },
@@ -41,8 +41,8 @@ export default function Sidebar() {
           <Shield className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="font-semibold text-lg">Sonatum</h1>
-          <p className="text-xs text-gray-400">Admin Panel</p>
+          <h1 className="font-semibold text-lg">Сонатум</h1>
+          <p className="text-xs text-gray-400">Админ-панель</p>
         </div>
       </div>
 
@@ -70,7 +70,7 @@ export default function Sidebar() {
 
       <button
         onClick={handleLogout}
-        className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-all"
+        className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-300 hover:bg-white/10 hover:text-white transition-all"
       >
         <LogOut className="w-5 h-5" />
         <span className="font-medium">Выйти</span>

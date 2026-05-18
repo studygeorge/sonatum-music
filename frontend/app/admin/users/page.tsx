@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '@/app/lib/adminApi';
 import { Search, Edit, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ruStatus, ruRole, ROLE_LABEL, STATUS_LABEL } from '@/app/admin/lib/labels';
 
 interface User {
   id: string;
@@ -136,10 +137,10 @@ export default function UsersPage() {
             className="px-4 py-3 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
           >
             <option value="">Все роли</option>
-            <option value="USER">USER</option>
-            <option value="ARTIST">ARTIST</option>
-            <option value="ADMIN">ADMIN</option>
-            <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+            <option value="USER">{ROLE_LABEL.USER}</option>
+            <option value="ARTIST">{ROLE_LABEL.ARTIST}</option>
+            <option value="ADMIN">{ROLE_LABEL.ADMIN}</option>
+            <option value="SUPER_ADMIN">{ROLE_LABEL.SUPER_ADMIN}</option>
           </select>
 
           <select
@@ -148,9 +149,9 @@ export default function UsersPage() {
             className="px-4 py-3 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
           >
             <option value="">Все статусы</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="SUSPENDED">SUSPENDED</option>
-            <option value="DELETED">DELETED</option>
+            <option value="ACTIVE">{STATUS_LABEL.ACTIVE}</option>
+            <option value="SUSPENDED">{STATUS_LABEL.SUSPENDED}</option>
+            <option value="DELETED">{STATUS_LABEL.DELETED}</option>
           </select>
         </div>
 
@@ -216,21 +217,20 @@ export default function UsersPage() {
                       <td className="px-6 py-4 text-sm text-gray-600">{user.email}</td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          user.role === 'SUPER_ADMIN' ? 'bg-[var(--background)] text-[var(--text-secondary)] border border-[var(--border)]' :
-                          user.role === 'ADMIN' ? 'bg-[var(--background)] text-[var(--text-secondary)] border border-[var(--border)]' :
-                          user.role === 'ARTIST' ? 'bg-[var(--background)] text-[var(--text-secondary)] border border-[var(--border)]' :
-                          'bg-gray-100 text-gray-800'
+                          user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' ? 'bg-black text-white' :
+                          user.role === 'ARTIST' ? 'bg-gray-700 text-white' :
+                          'bg-gray-100 text-gray-900'
                         }`}>
-                          {user.role}
+                          {ruRole(user.role)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          user.status === 'ACTIVE' ? 'bg-[var(--background)] text-[var(--text-secondary)] border border-[var(--border)]' :
-                          user.status === 'SUSPENDED' ? 'bg-[var(--background)] text-[var(--text-secondary)] border border-[var(--border)]' :
-                          'bg-[var(--background)] text-[var(--text-secondary)] border border-[var(--border)]'
+                          user.status === 'ACTIVE' ? 'bg-black text-white' :
+                          user.status === 'SUSPENDED' ? 'bg-white text-black border-2 border-black' :
+                          'bg-gray-200 text-gray-500'
                         }`}>
-                          {user.status}
+                          {ruStatus(user.status)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
@@ -242,14 +242,14 @@ export default function UsersPage() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleEdit(user)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-2 text-gray-700 hover:bg-gray-100 hover:text-black rounded-lg transition-colors"
                             title="Редактировать"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(user.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-2 text-gray-700 hover:bg-gray-100 hover:text-black rounded-lg transition-colors"
                             title="Удалить"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -306,10 +306,10 @@ export default function UsersPage() {
                   onChange={(e) => handleUpdateUser({ role: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
                 >
-                  <option value="USER">USER</option>
-                  <option value="ARTIST">ARTIST</option>
-                  <option value="ADMIN">ADMIN</option>
-                  <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                  <option value="USER">{ROLE_LABEL.USER}</option>
+                  <option value="ARTIST">{ROLE_LABEL.ARTIST}</option>
+                  <option value="ADMIN">{ROLE_LABEL.ADMIN}</option>
+                  <option value="SUPER_ADMIN">{ROLE_LABEL.SUPER_ADMIN}</option>
                 </select>
               </div>
 
@@ -322,9 +322,9 @@ export default function UsersPage() {
                   onChange={(e) => handleUpdateUser({ status: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
                 >
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="SUSPENDED">SUSPENDED</option>
-                  <option value="DELETED">DELETED</option>
+                  <option value="ACTIVE">{STATUS_LABEL.ACTIVE}</option>
+                  <option value="SUSPENDED">{STATUS_LABEL.SUSPENDED}</option>
+                  <option value="DELETED">{STATUS_LABEL.DELETED}</option>
                 </select>
               </div>
             </div>
