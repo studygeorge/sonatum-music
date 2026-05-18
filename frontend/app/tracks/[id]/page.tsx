@@ -10,6 +10,7 @@ import TrackTabs from '@/components/TrackTabs';
 import CommentsSection from '@/components/CommentsSection';
 import LicenseMarketplace from './LicenseMarketplace';
 import { Plus, Check, Flag } from 'lucide-react';
+import { PremiumModal } from '@/components/PremiumModal';
 
 export default function TrackPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -25,6 +26,8 @@ export default function TrackPage({ params }: { params: { id: string } }) {
   // Состояние "добавлен в библиотеку" (та же логика что у сердечка в плеере)
   const [inLibrary, setInLibrary] = useState(false);
   const [libraryBusy, setLibraryBusy] = useState(false);
+  // Premium-гейт для нот
+  const [premiumOpen, setPremiumOpen] = useState(false);
 
   // Тот же подход, что в Player.tsx — fetch с ключом sonatum_token.
   const toggleLibrary = async () => {
@@ -141,7 +144,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
   const releaseTypeLabel = track.album?.title || (isSheetOnly ? 'Ноты' : 'Сингл');
 
   return (
-    <main className="min-h-screen pt-0 md:pt-20 pb-32 px-4 md:px-8 max-w-[1500px] mx-auto flex flex-col xl:flex-row gap-6 animate-fadeInUp">
+    <main className="min-h-screen pt-24 md:pt-32 pb-32 px-4 md:px-8 max-w-[1500px] mx-auto flex flex-col xl:flex-row gap-6 animate-fadeInUp">
       
       {/* Левая колонка */}
       <div className="flex-1 xl:max-w-[850px]">
@@ -185,13 +188,21 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                      ▶ Слушать
                   </button>
                 ) : isSheetOnly && track.sheetMusic?.pdfUrl ? (
-                  <a
-                    href={track.sheetMusic.pdfUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-8 py-3 rounded-full text-[15px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold">
-                    Открыть ноты PDF
-                  </a>
+                  isPremium ? (
+                    <a
+                      href={track.sheetMusic.pdfUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-8 py-3 rounded-full text-[15px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold">
+                      Открыть ноты PDF
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => setPremiumOpen(true)}
+                      className="px-8 py-3 rounded-full text-[15px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold">
+                      Открыть ноты PDF · Premium
+                    </button>
+                  )
                 ) : null}
                 <button
                   onClick={toggleLibrary}
@@ -228,13 +239,21 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                    ▶ Слушать
                 </button>
               ) : isSheetOnly && track.sheetMusic?.pdfUrl ? (
-                <a
-                  href={track.sheetMusic.pdfUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex-1 py-3.5 rounded-2xl text-[15px] flex items-center justify-center gap-2 bg-[var(--text-primary)] text-white active:scale-95 transition-all shadow-sm font-bold">
-                  Открыть ноты PDF
-                </a>
+                isPremium ? (
+                  <a
+                    href={track.sheetMusic.pdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex-1 py-3.5 rounded-2xl text-[15px] flex items-center justify-center gap-2 bg-[var(--text-primary)] text-white active:scale-95 transition-all shadow-sm font-bold">
+                    Открыть ноты PDF
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => setPremiumOpen(true)}
+                    className="flex-1 py-3.5 rounded-2xl text-[15px] flex items-center justify-center gap-2 bg-[var(--text-primary)] text-white active:scale-95 transition-all shadow-sm font-bold">
+                    Открыть ноты PDF · Premium
+                  </button>
+                )
               ) : null}
               <button
                 onClick={toggleLibrary}
@@ -356,13 +375,21 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                      ▶ Слушать
                   </button>
                 ) : isSheetOnly && track.sheetMusic?.pdfUrl ? (
-                  <a
-                    href={track.sheetMusic.pdfUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-6 py-2.5 rounded-full text-[14px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold">
-                    Открыть ноты PDF
-                  </a>
+                  isPremium ? (
+                    <a
+                      href={track.sheetMusic.pdfUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-6 py-2.5 rounded-full text-[14px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold">
+                      Открыть ноты PDF
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => setPremiumOpen(true)}
+                      className="px-6 py-2.5 rounded-full text-[14px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold">
+                      Открыть · Premium
+                    </button>
+                  )
                 ) : null}
                 <button
                   onClick={toggleLibrary}
@@ -488,6 +515,9 @@ export default function TrackPage({ params }: { params: { id: string } }) {
         </div>,
         document.body
       )}
+
+      {/* Premium-гейт для нот */}
+      <PremiumModal open={premiumOpen} onClose={() => setPremiumOpen(false)} feature="Ноты" />
     </main>
   );
 }
