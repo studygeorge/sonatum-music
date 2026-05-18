@@ -48,6 +48,7 @@ interface Track {
     purchases: number;
     likedBy: number;
   };
+  metadata?: any;
 }
 
 interface Artist {
@@ -340,12 +341,45 @@ export default function TracksPage() {
   // Отклонение трека
   const handleReject = async (trackId: string, reason: string) => {
     const response = await adminApi.tracks.reject(trackId, reason);
-    
+
     if (response.success) {
       toast('Трек отклонён');
       loadInitialTracks();
     } else {
       toast('Ошибка: ' + response.error, 'error');
+    }
+  };
+
+  // Одобрение/отклонение ПРАВОК для опубликованного трека
+  // (metadata.pendingChanges, не сам status)
+  const callPending = async (trackId: string, action: 'approve' | 'reject') => {
+    const token = localStorage.getItem('sonatum_token');
+    const r = await fetch(`/api/admin/tracks/${trackId}/${action}-pending`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const j = await r.json().catch(() => ({}));
+    return j;
+  };
+  const handleApprovePending = async (trackId: string) => {
+    const j = await callPending(trackId, 'approve');
+    if (j.success) {
+      toast('Правки применены к публикации', 'success');
+      loadInitialTracks();
+    } else {
+      toast(j.error || 'Ошибка применения правок', 'error');
+    }
+  };
+  const handleRejectPending = async (trackId: string) => {
+    const j = await callPending(trackId, 'reject');
+    if (j.success) {
+      toast('Правки отклонены', 'success');
+      loadInitialTracks();
+    } else {
+      toast(j.error || 'Ошибка отклонения правок', 'error');
     }
   };
 
@@ -587,6 +621,12 @@ export default function TracksPage() {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {/* PUBLISHED + pendingChanges → отдельный бейдж '"'"'На модерации'"'"' */}
+                        {track.status === 'PUBLISHED' && track.metadata?.hasPendingChanges && (
+                          <span className="px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap bg-gray-700 text-white">
+                            На модерации
+                          </span>
+                        )}
                         <span className={`px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap ${
                           track.status === 'PUBLISHED' ? 'bg-black text-white' :
                           track.status === 'PENDING' ? 'bg-gray-700 text-white' :
@@ -708,6 +748,38 @@ export default function TracksPage() {
                           <XCircle className="w-4 h-4" />
                           Отклонить
                         </button>
+                      </div>
+                    )}
+
+                    {/* Опубликованный трек с правками — отдельные действия для правок */}
+                    {track.status === 'PUBLISHED' && track.metadata?.hasPendingChanges && (
+                      <div className="mt-3 pt-3 border-t border-gray-200 space-y-2">
+                        <div className="text-sm font-medium text-gray-900">
+                          Автор внёс правки в опубликованный трек
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {(() => {
+                            const pc = track.metadata?.pendingChanges || {};
+                            const keys = Object.keys(pc);
+                            return keys.length
+                              ? `Изменено полей: ${keys.length} (${keys.join(', ')})`
+                              : 'Нет данных о правках';
+                          })()}
+                        </div>
+                        <div className="flex gap-3 pt-1">
+                          <button
+                            onClick={() => handleApprovePending(track.id)}
+                            className="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-xl hover:bg-gray-800 transition-colors text-sm">
+                            <CheckCircle className="w-4 h-4" />
+                            Одобрить правки
+                          </button>
+                          <button
+                            onClick={() => handleRejectPending(track.id)}
+                            className="flex items-center gap-2 px-4 py-2 bg-white text-black border-2 border-black rounded-xl hover:bg-gray-100 transition-colors text-sm">
+                            <XCircle className="w-4 h-4" />
+                            Отклонить правки
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
