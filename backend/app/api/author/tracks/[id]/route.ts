@@ -88,9 +88,9 @@ export async function PATCH(
   const artist = await prisma.artist.findUnique({ where: { userId: session.userId }, select: { id: true } });
   if (!artist) return NextResponse.json({ success: false, error: 'No artist profile' }, { status: 404, headers: cors });
 
-  const existing = await prisma.track.findFirst({
+  const existing: any = await prisma.track.findFirst({
     where: { id: params.id, artistId: artist.id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, audioUrl: true, instrumentalUrl: true },
   });
   if (!existing) return NextResponse.json({ success: false, error: 'Not found or not yours' }, { status: 404, headers: cors });
 
@@ -117,7 +117,7 @@ export async function PATCH(
   } else if (body.audioUrl || body.instrumentalUrl !== undefined) {
     // Авто-определение типа от наличия файлов
     const hasFull = !!(body.audioUrl ?? existing.audioUrl);
-    const hasInstr = !!(body.instrumentalUrl !== undefined ? body.instrumentalUrl : (existing as any).instrumentalUrl);
+    const hasInstr = !!(body.instrumentalUrl !== undefined ? body.instrumentalUrl : existing.instrumentalUrl);
     data.audioType = hasFull && hasInstr ? 'BOTH' : hasInstr && !hasFull ? 'INSTRUMENTAL' : 'FULL';
   }
 
