@@ -168,6 +168,12 @@ export default function UploadWizardPage() {
       let audioUrl = '';
       let duration = 0;
       if (audioFile) {
+        // Извлекаем реальную длительность ДО отправки (через временный <audio>)
+        try {
+          duration = Math.round(await getAudioDurationFromFile(audioFile));
+        } catch {
+          duration = 0;
+        }
         const fd = new FormData();
         fd.append('file', audioFile);
         fd.append('artistSlug', artistSlug);
@@ -178,9 +184,8 @@ export default function UploadWizardPage() {
         });
         const aj = await ar.json();
         if (!aj.success) throw new Error(aj.error || 'Ошибка загрузки аудио');
-        // Backend returns { success: true, data: { audioUrl, filename, size, mimetype, fullPath } }
         audioUrl = aj.data?.audioUrl || aj.audioUrl || aj.url || '';
-        duration = aj.data?.duration || aj.duration || 180;
+        if (!duration) duration = Number(aj.data?.duration || aj.duration || 0) || 0;
         if (!audioUrl) throw new Error('Сервер вернул пустой audioUrl');
       }
 
@@ -237,7 +242,7 @@ export default function UploadWizardPage() {
 
       const trackPayload: any = {
         title: effectiveTitle,
-        duration: duration || 180,
+        duration: duration || 0,
         audioUrl: audioUrl || minusUrl || '',
         cover: coverUrl || undefined,
         lyrics: lyrics.trim() || undefined,
@@ -783,6 +788,27 @@ export default function UploadWizardPage() {
       </form>
     </div>
   );
+}
+
+// Извлечь длительность аудио-файла через временный <audio>-элемент.
+// Работает на всех современных браузерах для MP3/WAV/OGG/FLAC.
+function getAudioDurationFromFile(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const audio = document.createElement('audio');
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      const d = audio.duration;
+      if (isFinite(d) && d > 0) resolve(d);
+      else reject(new Error('Invalid duration'));
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load audio metadata'));
+    };
+    audio.src = url;
+  });
 }
 
 function ContentTypeCard({

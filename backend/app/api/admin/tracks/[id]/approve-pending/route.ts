@@ -31,7 +31,7 @@ export async function POST(
       const prismaFields: Record<string, any> = {};
       const directPrisma = [
         'title', 'lyrics', 'cover', 'price', 'instrumentalPrice',
-        'isForSale', 'isFree', 'bpm', 'key', 'audioUrl',
+        'isForSale', 'isFree', 'bpm', 'key', 'audioUrl', 'duration',
         'instrumentalUrl', 'audioType', 'releaseDate',
       ];
       for (const f of directPrisma) {
@@ -39,7 +39,7 @@ export async function POST(
           prismaFields[f] =
             f === 'releaseDate' ? (pending[f] ? new Date(pending[f]) : null) :
             (f === 'price' || f === 'instrumentalPrice') ? (pending[f] === null ? null : Number(pending[f])) :
-            f === 'bpm' ? (pending[f] === null ? null : Number(pending[f])) :
+            (f === 'bpm' || f === 'duration') ? (pending[f] === null ? null : Math.round(Number(pending[f]))) :
             pending[f];
         }
       }

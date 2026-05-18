@@ -35,7 +35,9 @@ export async function POST(request: NextRequest) {
       const safeTitle: string =
         (title && String(title).trim()) ||
         `Без названия ${new Date().toLocaleDateString('ru-RU')}`;
-      const safeDuration: number = Number(duration) > 0 ? Number(duration) : 180;
+      // 0 = неизвестно (UI скрывает «Длительность»). Раньше был хардкод 180 — он
+      // показывал '3:00' даже у sheet-only треков, что вводило в заблуждение.
+      const safeDuration: number = Number(duration) > 0 ? Number(duration) : 0;
       const safeAudioUrl: string = audioUrl || instrumentalUrl || '';
 
       const artist = await prisma.artist.findUnique({

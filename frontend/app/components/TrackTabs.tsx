@@ -63,11 +63,11 @@ export default function TrackTabs({ track, isPremium, isSheetOnly = false }: Tra
 
   const metaRows: { label: string; value: string | number | undefined }[] = [
     { label: 'Исполнитель', value: track.artist?.name },
-    { label: 'Альбом', value: track.album?.title || 'Сингл' },
+    { label: 'Альбом', value: track.album?.title || (isSheetOnly ? undefined : 'Сингл') },
     { label: 'Жанр', value: (track as any).genre?.name || (track as any).genres?.[0]?.genre?.name },
     { label: 'Год выпуска', value: track.releaseDate ? new Date(track.releaseDate).getFullYear() : undefined },
-    { label: 'Длительность', value: track.duration ? formatTime(track.duration) : undefined },
-    { label: 'Прослушиваний', value: track.playCount?.toLocaleString('ru-RU') },
+    { label: 'Длительность', value: track.duration && track.duration > 0 ? formatTime(track.duration) : undefined },
+    { label: 'Прослушиваний', value: isSheetOnly ? undefined : track.playCount?.toLocaleString('ru-RU') },
   ].filter(r => r.value);
 
   const lyricsBlocks = track.lyrics?.trim().split(/\n{2,}/) ?? [];

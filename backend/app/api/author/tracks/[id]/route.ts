@@ -140,6 +140,10 @@ export async function PATCH(
     if (typeof body.audioUrl === 'string' && body.audioUrl && body.audioUrl !== existing.audioUrl) {
       pending.audioUrl = body.audioUrl;
     }
+    if (body.duration !== undefined) {
+      const nd = Number(body.duration) > 0 ? Math.round(Number(body.duration)) : 0;
+      if (nd !== Number(existing.duration || 0)) pending.duration = nd;
+    }
     if (body.instrumentalUrl !== undefined && (body.instrumentalUrl || null) !== (existing.instrumentalUrl || null)) {
       pending.instrumentalUrl = body.instrumentalUrl || null;
     }
@@ -239,6 +243,7 @@ export async function PATCH(
   if (body.key !== undefined) data.key = body.key || null;
 
   if (typeof body.audioUrl === 'string' && body.audioUrl) data.audioUrl = body.audioUrl;
+  if (body.duration !== undefined) data.duration = Number(body.duration) > 0 ? Math.round(Number(body.duration)) : 0;
   if (body.instrumentalUrl !== undefined) data.instrumentalUrl = body.instrumentalUrl || null;
   if (body.audioType && ['FULL', 'INSTRUMENTAL', 'BOTH'].includes(body.audioType)) {
     data.audioType = body.audioType;

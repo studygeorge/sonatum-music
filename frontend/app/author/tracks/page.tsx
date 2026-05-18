@@ -39,7 +39,24 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   ARCHIVED: { label: 'В архиве', cls: 'bg-gray-200 text-gray-500' },
 };
 
+// Извлечь длительность аудио-файла через временный <audio>-элемент.
+function getAudioDurationFromFile(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const audio = document.createElement('audio');
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      const d = audio.duration;
+      if (isFinite(d) && d > 0) resolve(d); else reject(new Error('bad'));
+    };
+    audio.onerror = () => { URL.revokeObjectURL(url); reject(new Error('err')); };
+    audio.src = url;
+  });
+}
+
 function fmtDuration(s: number) {
+  if (!s || s <= 0) return null;
   const m = Math.floor(s / 60);
   const sec = s % 60;
   return `${m}:${String(sec).padStart(2, '0')}`;
@@ -180,8 +197,8 @@ function AuthorTracksPageInner() {
                       )}
                     </div>
                     <div className="text-xs text-[var(--text-secondary)] mt-0.5 flex items-center gap-3 flex-wrap">
-                      <span>{fmtDuration(t.duration)}</span>
-                      <span>· {t.playCount.toLocaleString('ru-RU')} прослушиваний</span>
+                      {fmtDuration(t.duration) && <span>{fmtDuration(t.duration)}</span>}
+                      <span>{t.playCount.toLocaleString('ru-RU')} прослушиваний</span>
                       <span>· {t.purchaseCount} продаж</span>
                       {t.price && Number(t.price) > 0 && (
                         <span>· {Number(t.price).toLocaleString('ru-RU')} ₽</span>
@@ -278,6 +295,7 @@ function EditTrackInline({
   const [bpm, setBpm] = useState<string>('');
   const [musKey, setMusKey] = useState('');
   const [audioUrl, setAudioUrl] = useState('');
+  const [duration, setDuration] = useState<number>(0); // длительность в секундах
   const [instrumentalUrl, setInstrumentalUrl] = useState('');
   const [sheetUrl, setSheetUrl] = useState('');
   // Параметры нот
@@ -346,6 +364,7 @@ function EditTrackInline({
           setBpm(d.bpm ? String(d.bpm) : '');
           setMusKey(d.key || '');
           setAudioUrl(d.audioUrl || '');
+          setDuration(Number(d.duration) || 0);
           setInstrumentalUrl(d.instrumentalUrl || d.minusAudioUrl || '');
           setSheetUrl(d.sheetUrl || '');
           setSheetInstrument((d as any).sheetInstrument || 'Фортепиано');
@@ -392,6 +411,11 @@ function EditTrackInline({
     setUploadingAudio(true);
     setError('');
     try {
+      // Сначала извлекаем реальную длительность из MP3
+      try {
+        const d = await getAudioDurationFromFile(f);
+        if (d > 0) setDuration(Math.round(d));
+      } catch {}
       const url = await uploadFile(f, '/api/upload/audio');
       if (url) setAudioUrl(url);
     } catch (e: any) {
@@ -455,6 +479,7 @@ function EditTrackInline({
         bpm,
         key: musKey,
         audioUrl,
+        duration, // секунд (0 если sheet-only)
         instrumentalUrl,
         sheetUrl,
         sheetInstrument,
