@@ -46,11 +46,14 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
     setOffset({ x: 0, y: 0 });
   };
 
-  const minScale = () => {
-    if (!natural.w || !natural.h) return 0.1;
+  // Минимальный масштаб: позволяем сильно уменьшить (картинка может быть меньше круга)
+  const minScale = () => 0.05;
+  const fitScale = () => {
+    if (!natural.w || !natural.h) return 1;
     const minSide = Math.min(natural.w, natural.h);
     return CIRCLE / minSide;
   };
+  const maxScale = () => fitScale() * 10;
 
   // PC drag
   const onPointerDown = (e: React.PointerEvent) => {
@@ -69,13 +72,6 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
     try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
   };
 
-  // Wheel zoom (PC)
-  const onWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = -e.deltaY * 0.0015;
-    setScale((s) => clamp(s * (1 + delta), minScale(), minScale() * 10));
-  };
-
   // Pinch zoom (mobile)
   const onTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
@@ -91,15 +87,29 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
       const [a, b] = [e.touches[0], e.touches[1]];
       const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
       const ns = pinchRef.current.s * (d / pinchRef.current.d);
-      setScale(clamp(ns, minScale(), minScale() * 10));
+      setScale(clamp(ns, minScale(), maxScale()));
     }
   };
   const onTouchEnd = (e: React.TouchEvent) => {
     if (e.touches.length < 2) pinchRef.current.active = false;
   };
 
+  // Wheel zoom — native listener с {passive:false}, иначе preventDefault не работает
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = -e.deltaY * 0.0015;
+      setScale((s) => clamp(s * (1 + delta), minScale(), maxScale()));
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, [natural.w, natural.h]);
+
   const reset = () => {
-    setScale(minScale());
+    setScale(fitScale());
     setOffset({ x: 0, y: 0 });
   };
 
@@ -163,13 +173,13 @@ export default function AvatarCropModal({ file, onCancel, onDone }: Props) {
 
       {/* Сам кадрировщик */}
       <div
+        ref={stageRef}
         className="relative overflow-hidden select-none touch-none"
         style={{ width: CONTAINER, height: CONTAINER, maxWidth: '100vw', maxHeight: '100vh' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onWheel={onWheel}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}>
