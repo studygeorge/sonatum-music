@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { authStorage } from "@/app/lib/auth";
 
 interface PremiumModalProps {
   open: boolean;
@@ -12,6 +13,7 @@ interface PremiumModalProps {
 const PLANS = [
   {
     id: "monthly",
+    tier: "PREMIUM",
     title: "Месяц",
     price: "299 ₽",
     period: "в месяц",
@@ -19,6 +21,7 @@ const PLANS = [
   },
   {
     id: "yearly",
+    tier: "PREMIUM_YEAR",
     title: "Год",
     price: "2 490 ₽",
     period: "в год",
@@ -27,6 +30,7 @@ const PLANS = [
   },
   {
     id: "student",
+    tier: "STUDENT",
     title: "Студенческий",
     price: "149 ₽",
     period: "в месяц",
@@ -54,6 +58,40 @@ export function PremiumModal({ open, onClose, feature }: PremiumModalProps) {
       window.removeEventListener("keydown", onEsc);
     };
   }, [open, onClose]);
+
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  const handleSubscribe = async (tier: string, planId: string) => {
+    setError("");
+    setBusy(planId);
+    try {
+      const token = authStorage.getToken();
+      if (!token) {
+        // не авторизован — на логин с возвратом
+        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+        return;
+      }
+      const res = await fetch("/api/payments/init", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ tier }),
+      });
+      const j = await res.json();
+      if (j?.success && j.paymentUrl) {
+        window.location.href = j.paymentUrl;
+        return;
+      }
+      setError(j?.error || "Не удалось перейти к оплате");
+    } catch (e: any) {
+      setError(e?.message || "Ошибка сети");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   if (!open) return null;
   if (typeof document === "undefined") return null;
@@ -110,26 +148,37 @@ export function PremiumModal({ open, onClose, feature }: PremiumModalProps) {
 
           {/* Тарифы — белые карточки контрастом к градиенту */}
           <div className="grid sm:grid-cols-3 gap-3 mb-6">
-            {PLANS.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => {
-                  window.location.href = `/profile?subscribe=${p.id}`;
-                }}
-                className="text-left p-5 rounded-2xl bg-white text-gray-900 hover:shadow-2xl transition relative"
-              >
-                {p.badge && (
-                  <span className="absolute -top-2 right-4 px-2.5 py-0.5 rounded-full bg-black text-white text-[10px] font-bold tracking-wide uppercase">
-                    {p.badge}
-                  </span>
-                )}
-                <div className="text-[12px] uppercase tracking-wider text-gray-500 font-semibold">{p.title}</div>
-                <div className="mt-2 text-[26px] font-extrabold text-gray-900 leading-none">{p.price}</div>
-                <div className="text-[12px] text-gray-500 mt-1">{p.period}</div>
-                <div className="text-[11px] text-gray-500 mt-3 leading-snug">{p.note}</div>
-              </button>
-            ))}
+            {PLANS.map((p) => {
+              const loading = busy === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => handleSubscribe(p.tier, p.id)}
+                  disabled={loading || !!busy}
+                  className="text-left p-5 rounded-2xl bg-white text-gray-900 hover:shadow-2xl transition relative disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {p.badge && (
+                    <span className="absolute -top-2 right-4 px-2.5 py-0.5 rounded-full bg-black text-white text-[10px] font-bold tracking-wide uppercase">
+                      {p.badge}
+                    </span>
+                  )}
+                  <div className="text-[12px] uppercase tracking-wider text-gray-500 font-semibold">{p.title}</div>
+                  <div className="mt-2 text-[26px] font-extrabold text-gray-900 leading-none">{p.price}</div>
+                  <div className="text-[12px] text-gray-500 mt-1">{p.period}</div>
+                  <div className="text-[11px] text-gray-500 mt-3 leading-snug">{p.note}</div>
+                  <div className="mt-3 text-[12px] font-bold text-black">
+                    {loading ? 'Открываем оплату…' : 'Оформить →'}
+                  </div>
+                </button>
+              );
+            })}
           </div>
+
+          {error && (
+            <div className="mb-4 rounded-xl bg-white/10 border border-white/30 px-4 py-3 text-sm text-white">
+              {error}
+            </div>
+          )}
 
           <p className="text-[11px] text-center text-white/80">
             Нажимая «Оформить», вы соглашаетесь с{" "}

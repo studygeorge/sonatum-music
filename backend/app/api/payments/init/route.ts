@@ -4,8 +4,12 @@ import { AuthService } from '@/lib/auth';
 import { getCorsHeaders } from '@/lib/cors';
 import { init as tinkoffInit } from '@/lib/tinkoff';
 
-const PRICES: Record<string, { kopecks: number; tier: 'PREMIUM'; description: string }> = {
-  PREMIUM: { kopecks: 29900, tier: 'PREMIUM', description: 'Sonatum Premium · подписка на 1 месяц' },};
+// Все три тарифа из ТЗ: ежемесячный Premium, годовой, студенческий
+const PRICES: Record<string, { kopecks: number; tier: 'PREMIUM' | 'STUDENT'; description: string; months: number }> = {
+  PREMIUM:      { kopecks: 29900,  tier: 'PREMIUM', description: 'Sonatum Premium · 1 месяц',           months: 1 },
+  PREMIUM_YEAR: { kopecks: 249000, tier: 'PREMIUM', description: 'Sonatum Premium · 1 год',             months: 12 },
+  STUDENT:      { kopecks: 14900,  tier: 'STUDENT', description: 'Sonatum Premium · студенческий 1 мес.', months: 1 },
+};
 
 const SITE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sonatum-music.ru';
 
