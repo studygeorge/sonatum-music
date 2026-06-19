@@ -85,20 +85,18 @@ export async function POST(request: NextRequest) {
     email: user.email,
     successUrl: `${SITE_URL}/author/settings?profi=ok`,
     failUrl: `${SITE_URL}/author/settings?profi=fail`,
+    notificationUrl: `${SITE_URL}/api/payments/tinkoff/notify`,
     receipt: {
       items: [
         {
           name: 'Подписка ПРОФИ · автор на «Сонатум»',
+          priceKopecks: PROFI_PRICE * 100,
           quantity: 1,
-          amount: PROFI_PRICE * 100,
-          price: PROFI_PRICE * 100,
-          tax: 'none',
-          paymentMethod: 'full_payment',
-          paymentObject: 'service',
         },
       ],
+      taxation: 'usn_income',
     },
-  } as any);
+  });
 
   if (!r?.ok || !r.paymentUrl) {
     return NextResponse.json(

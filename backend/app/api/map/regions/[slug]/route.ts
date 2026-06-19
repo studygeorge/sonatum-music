@@ -95,8 +95,48 @@ export async function GET(
         { status: 404, headers: corsHeaders }
       );
     }
+    // === Авто-подтяжка авторов и треков по ТЗ ===
+    // «Если у автора нет треков или регион не указан — он не отображается»
+    const artistIds = ((region as any).artists || []).map((a: any) => a.id);
+    let artistsWithTracks: any[] = [];
+    if (artistIds.length > 0) {
+      const counts = await prisma.track.groupBy({
+        by: ['artistId'],
+        where: { artistId: { in: artistIds }, status: 'PUBLISHED' },
+        _count: { _all: true },
+      });
+      const countMap = new Map(counts.map((c) => [c.artistId, c._count._all]));
+      artistsWithTracks = ((region as any).artists as any[])
+        .filter((a) => (countMap.get(a.id) || 0) > 0)
+        .map((a) => ({ ...a, trackCount: countMap.get(a.id) || 0 }));
+    }
+
+    // Топ треков региона — самые слушаемые
+    const topTracks = await prisma.track.findMany({
+      where: {
+        status: 'PUBLISHED',
+        audioUrl: { not: '' },
+        artist: { regionId: (region as any).id },
+      },
+      orderBy: { playCount: 'desc' },
+      take: 12,
+      select: {
+        id: true, title: true, slug: true, cover: true, duration: true, playCount: true,
+        artist: { select: { id: true, name: true, slug: true, avatar: true } },
+      },
+    });
+
     return NextResponse.json(
-      { success: true, data: region },
+      {
+        success: true,
+        data: {
+          ...region,
+          artists: artistsWithTracks,
+          topTracks,
+          totalArtists: artistsWithTracks.length,
+          totalTracks: topTracks.length,
+        },
+      },
       { headers: corsHeaders }
     );
   } catch (error) {

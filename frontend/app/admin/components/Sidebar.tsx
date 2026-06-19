@@ -11,15 +11,27 @@ import {
   FolderTree,
   Settings,
   LogOut,
-  FileText
+  FileText,
+  GraduationCap,
+  Banknote,
+  Wallet,
+  AlertTriangle,
+  BarChart3,
+  Flag
 } from 'lucide-react';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Главная', href: '/admin/dashboard' },
+  { icon: BarChart3, label: 'Финансы', href: '/admin/finance' },
   { icon: Users, label: 'Пользователи', href: '/admin/users' },
   { icon: Music, label: 'Треки', href: '/admin/tracks' },
   { icon: Mic2, label: 'Артисты', href: '/admin/artists' },
-  { icon: FolderTree, label: 'Жанры', href: '/admin/genres' },
+  { icon: FolderTree, label: "Жанры", href: "/admin/genres" },
+  { icon: GraduationCap, label: "Студенты", href: "/admin/student-verifications" },
+  { icon: Banknote, label: "B2B-начисления", href: "/admin/manual-payouts" },
+  { icon: Wallet, label: "Выплаты", href: "/admin/payouts" },
+  { icon: Flag, label: 'Жалобы', href: '/admin/reports' },
+  { icon: AlertTriangle, label: 'Ошибки', href: '/admin/errors' },
   { icon: Settings, label: 'Настройки', href: '/admin/settings' },
 ];
 

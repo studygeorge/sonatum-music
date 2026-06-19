@@ -1,5 +1,4 @@
 'use client';
-import DonateButton from '@/app/components/DonateButton';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -130,6 +129,15 @@ export default function ArtistPage() {
            </div>
 
            <div className="flex flex-col justify-center py-2 h-full w-full">
+              {(artist.isProfi || artist.verified) && (
+                <div className="flex items-center gap-2 mb-3">
+                  {artist.isProfi && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black text-white text-[10px] font-bold tracking-wider uppercase" title="Подписка ПРОФИ — расширенный профиль">
+                      ПРОФИ
+                    </span>
+                  )}
+                </div>
+              )}
               <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-8 text-[#1c1c1e]">
                 {artist.name}
               </h1>
@@ -139,7 +147,7 @@ export default function ArtistPage() {
                   className="px-8 py-3 rounded-full text-[15px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold"
                   onClick={() => artist.tracks && artist.tracks.length > 0 && playTrack(artist.tracks[0])}
                 >
-                   ▶ Перемешать
+                   Перемешать
                 </button>
                 <button
                   onClick={handleFollow}
@@ -152,8 +160,33 @@ export default function ArtistPage() {
                 >
                    {isFollowing ? '✓ Вы подписаны' : 'Подписаться'}
                 </button>
-                <DonateButton artistSlug={artist.slug} recipientName={artist.name} variant="secondary" />
               </div>
+
+              {/* Соцсети */}
+              {artist.socialLinks && Object.values(artist.socialLinks).some((v: any) => v) && (
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  {artist.socialLinks.vk && (
+                    <SocialLink href={artist.socialLinks.vk} label="ВКонтакте" />
+                  )}
+                  {artist.socialLinks.telegram && (
+                    <SocialLink
+                      href={artist.socialLinks.telegram.startsWith('@')
+                        ? `https://t.me/${artist.socialLinks.telegram.slice(1)}`
+                        : artist.socialLinks.telegram}
+                      label="Telegram"
+                    />
+                  )}
+                  {artist.socialLinks.youtube && (
+                    <SocialLink href={artist.socialLinks.youtube} label="YouTube" />
+                  )}
+                  {artist.socialLinks.instagram && (
+                    <SocialLink href={artist.socialLinks.instagram} label="Instagram" />
+                  )}
+                  {artist.socialLinks.website && (
+                    <SocialLink href={artist.socialLinks.website} label="Сайт" />
+                  )}
+                </div>
+              )}
            </div>
         </div>
 
@@ -216,7 +249,7 @@ export default function ArtistPage() {
                          <AvatarFallback size={20} />
                        )}
                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                         <span className="text-white text-xs font-bold">▶</span>
+                         <span className="text-white"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg></span>
                        </div>
                     </div>
                     <div className="flex-1 min-w-0 pr-4">
@@ -234,5 +267,23 @@ export default function ArtistPage() {
          </div>
       </div>
     </main>
+  );
+}
+
+function SocialLink({ href, label }: { href: string; label: string }) {
+  // Безопасный URL: добавляем https:// если отсутствует
+  const safeHref = href.startsWith('http') ? href : `https://${href}`;
+  return (
+    <a
+      href={safeHref}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#e8e6e1] text-[#1c1c1e] text-xs font-medium hover:bg-[#dfdcd5] transition-colors"
+      title={safeHref}>
+      {label}
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M7 17L17 7M17 7H8M17 7v9" />
+      </svg>
+    </a>
   );
 }

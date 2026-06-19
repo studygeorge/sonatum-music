@@ -24,7 +24,7 @@ export default function PlayerPaddingWrapper({ children }: { children: React.Rea
         }
         /* Mobile (default) */
         .dynamic-player-padding[data-collapsed="true"][data-auth="false"] { padding-top: 32px; }
-        .dynamic-player-padding[data-collapsed="false"][data-auth="false"] { padding-top: 160px; }
+        .dynamic-player-padding[data-collapsed="false"][data-auth="false"] { padding-top: 140px; }
         
         /* Desktop */
         @media (min-width: 768px) {

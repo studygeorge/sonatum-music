@@ -1,10 +1,62 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Artist } from '@/app/types';
 import { Users } from 'lucide-react';
+import { authStorage } from '@/app/lib/auth';
 
+import { toast } from '@/app/components/Toast';
 interface AuthorHeaderProps {
   author: Artist;
+}
+
+function FollowButton({ slug }: { slug: string }) {
+  const [following, setFollowing] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [authed, setAuthed] = useState(false);
+
+  useEffect(() => {
+    const token = authStorage.getToken();
+    if (!token) { setFollowing(false); return; }
+    setAuthed(true);
+    fetch(`/api/artists/${slug}/follow`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((j) => setFollowing(!!j.isFollowing))
+      .catch(() => setFollowing(false));
+  }, [slug]);
+
+  const toggle = async () => {
+    const token = authStorage.getToken();
+    if (!token) {
+      window.location.href = '/login';
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/artists/${slug}/follow`, {
+        method: following ? 'DELETE' : 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const j = await r.json();
+      if (j.success) setFollowing(!following);
+      else toast.error(j.error || 'Ошибка');
+    } finally { setBusy(false); }
+  };
+
+  if (following === null) return null;
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={busy}
+      className={`mt-4 px-6 py-2.5 rounded-full text-sm font-semibold transition-colors disabled:opacity-50 ${
+        following
+          ? 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+          : 'bg-[var(--text-primary)] text-white hover:bg-gray-800'
+      }`}>
+      {busy ? '…' : following ? '✓ Вы подписаны' : '+ Подписаться'}
+    </button>
+  );
 }
 
 export default function AuthorHeader({ author }: AuthorHeaderProps) {
@@ -45,15 +97,6 @@ export default function AuthorHeader({ author }: AuthorHeaderProps) {
               </div>
             )}
           </div>
-          
-          {/* Verified Badge */}
-          {author.verified && (
-            <div className="absolute bottom-1 right-1 w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center shadow-lg border-3 border-white">
-              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            </div>
-          )}
         </div>
 
         {/* Name */}
@@ -61,14 +104,7 @@ export default function AuthorHeader({ author }: AuthorHeaderProps) {
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-1">
             {author.name}
           </h1>
-          {author.verified && (
-            <div className="inline-flex items-center gap-1.5 text-blue-600">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              <span className="font-medium text-xs">Подтвержденный автор</span>
-            </div>
-          )}
+          {author.slug && <FollowButton slug={author.slug} />}
         </div>
       </div>
     </div>

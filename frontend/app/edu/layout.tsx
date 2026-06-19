@@ -23,11 +23,13 @@ const NAV_ADMIN = [
 const NAV_TEACHER = [
   { href: '/edu', label: 'Обзор' },
   { href: '/edu/playlists', label: 'Учебные плейлисты' },
+  { href: '/edu/settings', label: 'Настройки' },
 ];
 
 const NAV_STUDENT = [
   { href: '/edu', label: 'Обзор' },
   { href: '/edu/playlists', label: 'Учебные плейлисты' },
+  { href: '/edu/settings', label: 'Настройки' },
 ];
 
 export default function EduLayout({ children }: { children: React.ReactNode }) {
@@ -109,7 +111,7 @@ export default function EduLayout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="text-xs text-[var(--text-secondary)] mt-2">
               Статус:{' '}
-              <span className={ctx.institution.status === 'ACTIVE' ? 'text-green-700' : ''}>
+              <span className="font-semibold text-[var(--text-primary)]">
                 {ctx.institution.status === 'ACTIVE'
                   ? 'Активно'
                   : ctx.institution.status === 'APPROVED'
@@ -138,10 +140,11 @@ export default function EduLayout({ children }: { children: React.ReactNode }) {
                     ? 'bg-[var(--text-primary)] text-white'
                     : 'text-[var(--text-primary)] hover:bg-[var(--hover)]'
                 }`}>
-                              <span>{item.label}</span>
+                <span>{item.label}</span>
               </Link>
             ))}
           </nav>
+          <Link href="/profile" className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--hover)] transition-colors"><span>← Личный профиль</span></Link>
         </aside>
         <div className="min-w-0">{children}</div>
       </div>

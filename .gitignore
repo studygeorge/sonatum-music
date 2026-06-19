@@ -52,3 +52,11 @@ postgres-data/
 
 # Old extracted binary
 backend/lrt
+
+# Бэкапы БД и скрипт бэкапа (содержат данные/пароли) — НЕ коммитить
+backups/
+backup.sh
+*.sql
+*.sql.gz
+*.dump
+_archive/

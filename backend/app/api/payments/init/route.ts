@@ -4,6 +4,7 @@ import { AuthService } from '@/lib/auth';
 import { getCorsHeaders } from '@/lib/cors';
 import { init as tinkoffInit } from '@/lib/tinkoff';
 
+import { logError } from '@/lib/errors';
 // Все три тарифа из ТЗ: ежемесячный Premium, годовой, студенческий
 const PRICES: Record<string, { kopecks: number; tier: 'PREMIUM' | 'STUDENT'; description: string; months: number }> = {
   PREMIUM:      { kopecks: 29900,  tier: 'PREMIUM', description: 'Sonatum Premium · 1 месяц',           months: 1 },
@@ -38,12 +39,36 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ success: false, error: 'Пользователь' }, { status: 404, headers: corsHeaders });
     }
+    // Без email нельзя — на него уходит чек 54-ФЗ. Не пускаем к оплате.
+    if (!user.email || !user.email.trim()) {
+      return NextResponse.json(
+        { success: false, error: 'Укажите email в профиле — на него придёт чек об оплате', code: 'EMAIL_REQUIRED' },
+        { status: 400, headers: corsHeaders }
+      );
+    }
 
     const body = await request.json().catch(() => ({}));
     const tier = String(body?.tier || '').toUpperCase();
     const plan = PRICES[tier];
     if (!plan) {
       return NextResponse.json({ success: false, error: 'Неизвестный тариф' }, { status: 400, headers: corsHeaders });
+    }
+
+    // STUDENT — только при наличии валидной верификации (APPROVED, expires_at > now)
+    if (plan.tier === 'STUDENT') {
+      const [v] = (await prisma.$queryRawUnsafe(
+        `SELECT id, expires_at FROM student_verifications
+          WHERE user_id = $1 AND status = 'APPROVED' AND expires_at > now()
+          ORDER BY created_at DESC LIMIT 1`,
+        user.id
+      )) as any[];
+      if (!v) {
+        return NextResponse.json({
+          success: false,
+          error: 'Студенческий тариф доступен только после подтверждения статуса. Загрузите документ в разделе «Студенческий статус».',
+          code: 'STUDENT_NOT_VERIFIED',
+        }, { status: 403, headers: corsHeaders });
+      }
     }
 
     // Запрет на покупку, если уже есть активная подписка (PREMIUM/STUDENT)
@@ -120,7 +145,7 @@ export async function POST(request: NextRequest) {
       { headers: corsHeaders }
     );
   } catch (e) {
-    console.error('[PAYMENT_INIT]', e);
+    logError('payments.subscription-init', e, { request, extra: { tag: 'PAYMENT_INIT' } }).catch(()=>{}); console.error('[PAYMENT_INIT]', e);
     return NextResponse.json({ success: false, error: 'Ошибка сервера' }, { status: 500, headers: corsHeaders });
   }
 }

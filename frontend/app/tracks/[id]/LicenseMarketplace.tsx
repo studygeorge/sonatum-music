@@ -3,17 +3,47 @@
 import { useEffect, useState } from 'react';
 import { authStorage } from '@/app/lib/auth';
 
+import Portal from "@/app/components/Portal";
 type License = {
   code: string;
   name: string;
   shortName: string;
   audience: string;
   description: string;
+  rightsAllowed: string[];
+  rightsForbidden: string[];
+  territory: string;
   price: number;
   commissionPct: number;
   isB2B: boolean;
   requiresManager: boolean;
+  periodDays?: number | null;
 };
+
+// Расшифровка кодов прав в человеко-читаемый русский (ст. 1270 ГК РФ).
+const RIGHT_LABEL: Record<string, string> = {
+  communication: 'Доведение до всеобщего сведения (интернет)',
+  sync_video: 'Синхронизация с видеоматериалами',
+  sync_audio: 'Синхронизация с аудиоматериалами',
+  reproduction_montage: 'Воспроизведение (копирование для монтажа)',
+  reproduction_production: 'Воспроизведение (копирование для производства)',
+  reproduction_recording: 'Воспроизведение (копирование для записи)',
+  public_performance: 'Публичное исполнение (живьём, в учреждении)',
+  public_performance_theatre: 'Публичное исполнение в театре',
+  public_performance_education: 'Публичное исполнение в учебных целях',
+  modification: 'Переработка (кавер, ремикс, аранжировка)',
+  distribution: 'Распространение (продажа носителей)',
+  distribution_own: 'Распространение собственной записи',
+  broadcast: 'Сообщение в эфир / по кабелю (ТВ, радио)',
+  ad_tv: 'Использование в рекламе на ТВ/радио',
+  personal_use: 'Личное некоммерческое прослушивание',
+  monetization: 'Монетизация (стриминги, продажа)',
+  attribution_required: 'Обязательно указывать автора',
+};
+
+function labelRight(code: string): string {
+  return RIGHT_LABEL[code] || code.replace(/_/g, ' ');
+}
 
 export default function LicenseMarketplace({
   trackId,
@@ -31,10 +61,31 @@ export default function LicenseMarketplace({
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
+  const [phone, setPhone] = useState('');
   const [project, setProject] = useState('');
+  const [projectType, setProjectType] = useState('');
+  const [budget, setBudget] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [resultMessage, setResultMessage] = useState('');
+
+  const PROJECT_TYPES = [
+    { id: 'AD', label: 'Рекламный ролик' },
+    { id: 'FILM', label: 'Фильм' },
+    { id: 'SERIES', label: 'Сериал' },
+    { id: 'GAME', label: 'Видеоигра' },
+    { id: 'PODCAST', label: 'Подкаст' },
+    { id: 'EVENT', label: 'Корпоративное мероприятие' },
+    { id: 'PRESENTATION', label: 'Презентация' },
+    { id: 'OTHER', label: 'Другое' },
+  ];
+
+  const BUDGETS = [
+    { id: 'UNDER_10K', label: 'До 10 000 ₽' },
+    { id: '10_30K', label: '10 000 — 30 000 ₽' },
+    { id: '30_70K', label: '30 000 — 70 000 ₽' },
+    { id: 'OVER_70K', label: 'Свыше 70 000 ₽' },
+  ];
 
   useEffect(() => {
     fetch(`/api/tracks/${trackId}/licenses`)
@@ -44,6 +95,18 @@ export default function LicenseMarketplace({
       })
       .finally(() => setLoading(false));
   }, [trackId]);
+
+  // Внешнее открытие модалки конкретной лицензии — используется на странице трека
+  // для прямого «Купить минусовку» и других call-to-action.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const code = (e as CustomEvent).detail?.code;
+      const lic = licenses.find((l) => l.code === code);
+      if (lic) openModal(lic);
+    };
+    window.addEventListener('sonatum:open-license', onOpen);
+    return () => window.removeEventListener('sonatum:open-license', onOpen);
+  }, [licenses]);
 
   const openModal = (l: License) => {
     setActiveLicense(l);
@@ -61,12 +124,14 @@ export default function LicenseMarketplace({
   const submit = async () => {
     if (!activeLicense) return;
     setError('');
-    if (!email.trim()) {
-      setError('Укажите email');
-      return;
+    if (!email.trim()) { setError('Укажите email'); return; }
+    if (modal === 'B2B') {
+      if (!name.trim()) { setError('Укажите ваше имя'); return; }
+      if (!projectType) { setError('Выберите тип проекта'); return; }
+      if (!budget) { setError('Выберите бюджет'); return; }
     }
-    if ((modal === 'B2B' || modal === 'EXCLUSIVE') && !project.trim()) {
-      setError('Опишите проект');
+    if (modal === 'EXCLUSIVE' && !project.trim()) {
+      setError('Опишите ваше предложение автору');
       return;
     }
     setSubmitting(true);
@@ -84,7 +149,10 @@ export default function LicenseMarketplace({
           buyerEmail: email.trim(),
           buyerName: name.trim() || undefined,
           buyerCompany: company.trim() || undefined,
+          buyerPhone: phone.trim() || undefined,
           projectDescription: project.trim() || undefined,
+          projectType: projectType || undefined,
+          budget: budget || undefined,
         }),
       });
       const j = await r.json();
@@ -138,28 +206,39 @@ export default function LicenseMarketplace({
             </p>
             <div className="flex items-center gap-1 flex-wrap">
               {l.isB2B && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-black text-white">
                   B2B
                 </span>
               )}
               {l.requiresManager && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white border border-black text-black">
                   через менеджера
                 </span>
               )}
-              {l.audience && (
-                <span className="text-[10px] text-[var(--text-secondary)] truncate">
-                  {l.audience}
+              {l.territory && l.territory !== 'Мир' && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--hover)] text-[var(--text-secondary)]">
+                  {l.territory}
+                </span>
+              )}
+              {l.periodDays && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">
+                  абонемент · {l.periodDays} дн.
                 </span>
               )}
             </div>
+            {l.audience && (
+              <div className="text-[10px] text-[var(--text-secondary)] mt-2 leading-snug">
+                {l.audience}
+              </div>
+            )}
           </button>
         ))}
       </div>
       {/* Modal */}
       {modal && activeLicense && (
+<Portal>
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md"
+          className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md"
           onClick={() => !submitting && setModal(null)}>
           <div
             className="apple-card max-w-lg w-full p-6 shadow-2xl animate-fadeInUp max-h-[90vh] overflow-y-auto"
@@ -194,12 +273,65 @@ export default function LicenseMarketplace({
               </>
             ) : (
               <>
-                <p className="text-sm text-[var(--text-secondary)] mb-4">
+                <p className="text-sm text-[var(--text-secondary)] mb-3">
                   {activeLicense.description}
                 </p>
+
+                {/* Подробные права из ТЗ — что разрешено / что запрещено */}
+                {(activeLicense.rightsAllowed.length > 0 || activeLicense.rightsForbidden.length > 0) && (
+                  <div className="rounded-2xl bg-[var(--hover)] p-3 mb-4 text-xs">
+                    {activeLicense.audience && (
+                      <div className="mb-2">
+                        <span className="font-bold text-[var(--text-primary)]">Для кого: </span>
+                        <span className="text-[var(--text-secondary)]">{activeLicense.audience}</span>
+                      </div>
+                    )}
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {activeLicense.rightsAllowed.length > 0 && (
+                        <div>
+                          <div className="font-bold text-[var(--text-primary)] mb-1">Разрешено</div>
+                          <ul className="space-y-0.5">
+                            {activeLicense.rightsAllowed.map((r) => (
+                              <li key={r} className="flex items-start gap-1.5">
+                                <span className="text-[var(--text-primary)] mt-0.5">✓</span>
+                                <span className="text-[var(--text-secondary)] leading-snug">{labelRight(r)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {activeLicense.rightsForbidden.length > 0 && (
+                        <div>
+                          <div className="font-bold text-[var(--text-primary)] mb-1">Запрещено</div>
+                          <ul className="space-y-0.5">
+                            {activeLicense.rightsForbidden.map((r) => (
+                              <li key={r} className="flex items-start gap-1.5">
+                                <span className="text-[var(--text-primary)] mt-0.5">✗</span>
+                                <span className="text-[var(--text-secondary)] leading-snug">{labelRight(r)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-[var(--border)]">
+                      <span className="font-bold text-[var(--text-primary)]">Территория: </span>
+                      <span className="text-[var(--text-secondary)]">{activeLicense.territory}</span>
+                    </div>
+                    {activeLicense.periodDays && (
+                      <div className="mt-2 pt-2 border-t border-[var(--border)]">
+                        <span className="font-bold text-[var(--text-primary)]">Срок действия: </span>
+                        <span className="text-[var(--text-secondary)]">
+                          абонемент на {activeLicense.periodDays} дн. с момента оплаты — неограниченное количество исполнений
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {modal === 'EXCLUSIVE' && (
-                  <div className="apple-card p-3 bg-amber-50 border-amber-200 mb-4">
-                    <p className="text-xs text-amber-900 leading-snug">
+                  <div className="rounded-2xl border-2 border-black bg-[var(--hover)] p-3 mb-4">
+                    <p className="text-xs text-[var(--text-primary)] leading-snug">
                       «Сонатум» <strong>не продаёт</strong> исключительные права. Мы только помогаем связаться с автором. Дальнейшие переговоры и оплата происходят за пределами платформы.
                     </p>
                   </div>
@@ -253,20 +385,66 @@ export default function LicenseMarketplace({
                       </div>
                     )}
                   </div>
-                  {(modal === 'B2B' || modal === 'EXCLUSIVE') && (
+                  {modal === 'B2B' && (
+                    <>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs font-medium mb-1">Тип проекта *</label>
+                          <select
+                            value={projectType}
+                            onChange={(e) => setProjectType(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-white outline-none focus:ring-2 focus:ring-[var(--accent)] text-sm">
+                            <option value="">— выберите —</option>
+                            {PROJECT_TYPES.map((p) => (
+                              <option key={p.id} value={p.id}>{p.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium mb-1">Бюджет *</label>
+                          <select
+                            value={budget}
+                            onChange={(e) => setBudget(e.target.value)}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-white outline-none focus:ring-2 focus:ring-[var(--accent)] text-sm">
+                            <option value="">— выберите —</option>
+                            {BUDGETS.map((b) => (
+                              <option key={b.id} value={b.id}>{b.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Телефон</label>
+                        <input
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="+7 ___ ___-__-__"
+                          className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-white outline-none focus:ring-2 focus:ring-[var(--accent)] text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1">Описание проекта</label>
+                        <textarea
+                          rows={3}
+                          value={project}
+                          onChange={(e) => setProject(e.target.value)}
+                          placeholder="Что за проект, территория, срок использования, медиа…"
+                          className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-white outline-none focus:ring-2 focus:ring-[var(--accent)] text-sm resize-none"
+                        />
+                      </div>
+                    </>
+                  )}
+                  {modal === 'EXCLUSIVE' && (
                     <div>
                       <label className="block text-xs font-medium mb-1">
-                        Описание проекта *
+                        Ваше сообщение автору *
                       </label>
                       <textarea
                         rows={4}
                         value={project}
                         onChange={(e) => setProject(e.target.value)}
-                        placeholder={
-                          modal === 'EXCLUSIVE'
-                            ? 'Для каких целей нужны исключительные права, бюджет, сроки…'
-                            : 'Тип проекта, бюджет, территория, медиа…'
-                        }
+                        placeholder="Для каких целей нужны исключительные права, бюджет, сроки…"
                         className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-white outline-none focus:ring-2 focus:ring-[var(--accent)] text-sm resize-none"
                       />
                     </div>
@@ -295,6 +473,7 @@ export default function LicenseMarketplace({
             )}
           </div>
         </div>
+</Portal>
       )}
     </section>
   );

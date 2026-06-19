@@ -91,6 +91,16 @@ export async function GET(request: NextRequest) {
 
   const balance = Number(user.balance) || 0;
 
+  // Доп.поля артиста (раздельные колонки приватности эксклюзивных)
+  let artistExtras: any = null;
+  if (user.artistProfile) {
+    const [a] = (await prisma.$queryRawUnsafe(
+      `SELECT exclusive_mode, exclusive_contact_email, exclusive_contact_phone, exclusive_contact_telegram FROM artists WHERE id = $1`,
+      user.artistProfile.id
+    ).catch(() => [])) as any[];
+    artistExtras = a;
+  }
+
   return NextResponse.json(
     {
       success: true,
@@ -122,6 +132,11 @@ export async function GET(request: NextRequest) {
               city: user.artistProfile.city,
               verified: user.artistProfile.verified,
               followers: user.artistProfile.followers,
+              socialLinks: (user.artistProfile as any).socialLinks || null,
+              exclusiveMode: (artistExtras as any)?.exclusive_mode || 'ANONYMOUS',
+              exclusiveContactEmail: (artistExtras as any)?.exclusive_contact_email || null,
+              exclusiveContactPhone: (artistExtras as any)?.exclusive_contact_phone || null,
+              exclusiveContactTelegram: (artistExtras as any)?.exclusive_contact_telegram || null,
             }
           : null,
         collective: user.collective
@@ -197,6 +212,31 @@ export async function PATCH(request: NextRequest) {
       verified: true, followers: true,
     },
   });
+
+  // === Настройки приватности исключительных лицензий ===
+  // exclusiveMode: SHOW_CONTACTS | ANONYMOUS | DISABLED
+  if (body.exclusiveMode !== undefined || body.exclusiveContactEmail !== undefined
+      || body.exclusiveContactPhone !== undefined || body.exclusiveContactTelegram !== undefined) {
+    const updates: Array<{ col: string; val: any }> = [];
+    if (body.exclusiveMode !== undefined) {
+      const mode = String(body.exclusiveMode).toUpperCase();
+      if (['SHOW_CONTACTS', 'ANONYMOUS', 'DISABLED'].includes(mode)) {
+        updates.push({ col: 'exclusive_mode', val: mode });
+      }
+    }
+    if (body.exclusiveContactEmail !== undefined) updates.push({ col: 'exclusive_contact_email', val: body.exclusiveContactEmail || null });
+    if (body.exclusiveContactPhone !== undefined) updates.push({ col: 'exclusive_contact_phone', val: body.exclusiveContactPhone || null });
+    if (body.exclusiveContactTelegram !== undefined) updates.push({ col: 'exclusive_contact_telegram', val: body.exclusiveContactTelegram || null });
+    if (updates.length > 0) {
+      const setParts = updates.map((u, i) => `${u.col} = $${i + 1}`);
+      const values = updates.map(u => u.val);
+      await prisma.$executeRawUnsafe(
+        `UPDATE artists SET ${setParts.join(', ')}, "updatedAt" = now() WHERE id = $${updates.length + 1}`,
+        ...values,
+        artist.id
+      );
+    }
+  }
 
   return NextResponse.json({ success: true, data: updated }, { headers: cors });
 }

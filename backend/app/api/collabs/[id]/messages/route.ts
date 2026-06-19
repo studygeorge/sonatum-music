@@ -57,17 +57,40 @@ export async function POST(
       { status: 404, headers: cors }
     );
   }
-  if (r.author_id === session.userId) {
-    return NextResponse.json(
-      { success: false, error: 'Нельзя писать на свою заявку' },
-      { status: 400, headers: cors }
-    );
-  }
   if (r.status !== 'ACTIVE') {
     return NextResponse.json(
       { success: false, error: 'Заявка не активна' },
       { status: 400, headers: cors }
     );
+  }
+
+  // Determine recipient:
+  //   - If author of the request is messaging → reply to last interlocutor
+  //   - If outsider → message goes to the author
+  let toUserId: string;
+  if (r.author_id === session.userId) {
+    const [last] = (await prisma.$queryRawUnsafe(
+      `SELECT from_user_id, to_user_id FROM collab_messages
+        WHERE request_id = $1 AND (from_user_id = $2 OR to_user_id = $2)
+        ORDER BY created_at DESC LIMIT 1`,
+      params.id, session.userId
+    )) as any[];
+    if (!last) {
+      return NextResponse.json(
+        { success: false, error: 'Нельзя начать переписку с самим собой. Дождитесь входящего сообщения.' },
+        { status: 400, headers: cors }
+      );
+    }
+    toUserId = last.from_user_id === session.userId ? last.to_user_id : last.from_user_id;
+  } else {
+    toUserId = r.author_id;
+  }
+
+  // Если ответ может быть направлен конкретному собеседнику — через query peer=
+  const url = new URL(request.url);
+  const peer = url.searchParams.get('peer');
+  if (peer && r.author_id === session.userId) {
+    toUserId = peer;  // автор отвечает указанному собеседнику
   }
 
   const msgId = cuid();
@@ -77,11 +100,32 @@ export async function POST(
     msgId,
     params.id,
     session.userId,
-    r.author_id,
+    toUserId,
     body.body.trim()
   );
 
-  return NextResponse.json({ success: true, id: msgId }, { headers: cors });
+  return NextResponse.json({ success: true, id: msgId, toUserId }, { headers: cors });
+}
+
+// PATCH /api/collabs/[id]/messages — пометить все входящие как прочитанные (badge counter)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const cors = getCorsHeaders(request.headers.get('origin') || undefined);
+  const auth = request.headers.get('Authorization');
+  if (!auth?.startsWith('Bearer ')) {
+    return NextResponse.json({ success: false, error: 'Требуется авторизация' }, { status: 401, headers: cors });
+  }
+  const session = await AuthService.validateSession(auth.substring(7));
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Сессия истекла' }, { status: 401, headers: cors });
+  }
+  await prisma.$executeRawUnsafe(
+    `UPDATE collab_messages SET is_read = true WHERE request_id = $1 AND to_user_id = $2 AND is_read = false`,
+    params.id, session.userId
+  );
+  return NextResponse.json({ success: true }, { headers: cors });
 }
 
 // GET /api/collabs/[id]/messages — получить все сообщения по заявке (для участников)

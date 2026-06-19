@@ -16,7 +16,7 @@ from urllib.error import HTTPError, URLError
 import psycopg2
 
 DB = dict(host="127.0.0.1", port=5432, dbname="sonatum_music",
-          user="sonatum_user", password="Sonatum_Music_2026_Strong_Pass")
+          user="sonatum_user", password=os.getenv("PGPASSWORD",""))
 DATA_DIR = "/opt/sonatum/data"
 COVER_DIR = os.path.join(DATA_DIR, "images", "composers")
 USER_AGENT = "SonatumImporter/1.0 (https://sonatum-music.ru; info@sonatum-music.ru)"

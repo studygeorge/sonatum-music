@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { authStorage } from '@/app/lib/auth';
 
+import Portal from "@/app/components/Portal";
 export default function DonateButton({
   artistSlug,
   collectiveSlug,
@@ -81,8 +82,9 @@ export default function DonateButton({
         Поддержать
       </button>
       {open && (
+<Portal>
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md"
+          className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md"
           onClick={() => !submitting && setOpen(false)}>
           <div
             className="apple-card max-w-sm w-full p-6 shadow-2xl animate-fadeInUp"
@@ -99,7 +101,7 @@ export default function DonateButton({
               </button>
             </div>
             <p className="text-xs text-[var(--text-secondary)] mb-4">
-              100% суммы поступит автору. Комиссия платформы: 0%.
+              Автору поступит 90% от суммы. Комиссия платформы: 10%.
             </p>
             <div className="grid grid-cols-3 gap-2 mb-3">
               {[50, 100, 500].map((v) => (
@@ -162,6 +164,7 @@ export default function DonateButton({
             </p>
           </div>
         </div>
+</Portal>
       )}
     </>
   );

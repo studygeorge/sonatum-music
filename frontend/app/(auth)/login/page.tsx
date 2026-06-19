@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api, ApiResponse, LoginResponse } from '@/app/lib/api';
 import { authStorage } from '@/app/lib/auth';
 import { ShimmerButton } from '@/app/components/ShimmerButton';
+import VKAuthButton from '@/app/components/VKAuthButton';
 import { ShineBorder } from '@/app/components/ShineBorder';
 
 export default function LoginPage() {
@@ -15,18 +16,31 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      const response: ApiResponse<LoginResponse> = await api.login(email, password);
+      const response: ApiResponse<LoginResponse> = await api.login(
+        email,
+        password,
+        twoFactorRequired ? twoFactorCode.trim() : undefined,
+      );
       if (response.success && response.data) {
         authStorage.setToken(response.data.token);
         authStorage.setUser(response.data.user);
         router.push('/');
       } else {
+        // Бэкенд просит код 2FA
+        if ((response.data as any)?.requires2FA) {
+          setTwoFactorRequired(true);
+          // Если код уже вводился и не подошёл — показываем ошибку
+          setError(twoFactorCode ? (response.error || 'Неверный код') : '');
+          return;
+        }
         setError(response.error || 'Неверный email или пароль');
       }
     } catch {
@@ -89,6 +103,28 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {twoFactorRequired && (
+              <div className="rounded-2xl border-2 border-black p-3 bg-[var(--hover)]">
+                <label className="block text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider mb-2">
+                  Код двухфакторной аутентификации
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="\d{6}"
+                  maxLength={9}
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value.replace(/[^0-9A-Fa-f-]/g, ''))}
+                  placeholder="000000 или XXXX-XXXX"
+                  autoFocus
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[var(--border)] focus:border-black focus:outline-none text-sm font-mono tracking-widest text-center"
+                />
+                <p className="text-[11px] text-[var(--text-secondary)] mt-1.5">
+                  Введите 6-значный код из приложения-аутентификатора. Если потеряли телефон — используйте один из backup-кодов.
+                </p>
+              </div>
+            )}
+
             <ShimmerButton
               type="submit"
               disabled={loading}
@@ -103,9 +139,17 @@ export default function LoginPage() {
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
                   Входим...
                 </span>
-              ) : 'Войти'}
+              ) : twoFactorRequired ? 'Подтвердить' : 'Войти'}
             </ShimmerButton>
           </form>
+
+          <div className="my-4 flex items-center gap-3 text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">
+            <div className="flex-1 h-px bg-[var(--border)]" />
+            <span>или</span>
+            <div className="flex-1 h-px bg-[var(--border)]" />
+          </div>
+
+          <VKAuthButton />
         </div>
 
         <p className="text-center mt-3 text-sm text-[var(--text-secondary)]">

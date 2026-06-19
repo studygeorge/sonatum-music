@@ -73,13 +73,14 @@ export async function init(p: InitParams): Promise<{
       Phone: p.phone,
       Taxation: p.receipt.taxation || "usn_income",
       Items: p.receipt.items.map(it => ({
-        Name: it.name,
+        Name: it.name.slice(0, 128),
         Price: it.priceKopecks,
         Quantity: it.quantity,
         Amount: it.priceKopecks * it.quantity,
         Tax: "none",
         PaymentMethod: "full_payment",
         PaymentObject: "service",
+        MeasurementUnit: "шт",
       })),
     };
   }

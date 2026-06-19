@@ -44,7 +44,11 @@ export default function ChartRow({ track, rank }: { track: Track; rank: number }
             isNow ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           }`}
         >
-          <span className="text-white font-bold">{isNow ? '❚❚' : '▶'}</span>
+          {isNow ? (
+            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" /></svg>
+          ) : (
+            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+          )}
         </div>
       </div>
       <div className="flex-1 min-w-0">

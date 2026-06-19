@@ -23,7 +23,7 @@ from urllib.error import HTTPError, URLError
 import psycopg2
 
 DB = dict(host="127.0.0.1", port=5432, dbname="sonatum_music",
-          user="sonatum_user", password="Sonatum_Music_2026_Strong_Pass")
+          user="sonatum_user", password=os.getenv("PGPASSWORD",""))
 DATA_DIR = "/opt/sonatum/data"
 AUDIO_DIR = os.path.join(DATA_DIR, "audio", "import")
 COVER_DIR = os.path.join(DATA_DIR, "images", "composers")

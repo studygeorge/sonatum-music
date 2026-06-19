@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAuth, AuthUser } from '@/lib/auth';
 import { getCorsHeaders } from '@/lib/cors';
+import { getSubLevel } from '@/lib/subscription';
 
 export async function OPTIONS(request: NextRequest) {
   return new Response(null, {
@@ -69,13 +70,13 @@ async function postHandler(request: NextRequest, user: AuthUser, { params }: { p
   const origin = request.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin || undefined);
 
-  const sub = await prisma.subscription.findUnique({
-    where: { userId: user.id.toString() }
-  });
-  const isPremium = sub?.tier === 'PREMIUM' || sub?.tier === 'STUDENT';
-
-  if (!isPremium) {
-    return NextResponse.json({ success: false, error: 'Комментирование доступно только с подпиской Premium' }, { status: 403, headers: corsHeaders });
+  // Только Premium/Student могут писать комментарии (Free — только чтение)
+  const sub = await getSubLevel(user.id.toString());
+  if (!sub.isPremium) {
+    return NextResponse.json(
+      { success: false, error: 'Комментирование доступно только с подпиской Premium', code: 'PREMIUM_REQUIRED' },
+      { status: 403, headers: corsHeaders }
+    );
   }
 
   try {

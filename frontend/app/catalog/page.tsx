@@ -187,7 +187,11 @@ export default function CatalogPage() {
                 <h3 className="font-semibold mb-4 text-[var(--text-secondary)]">{filterGroup.label}</h3>
                 <div className="flex flex-col gap-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                   {filterGroup.options.map(opt => (
-                    <label key={opt} className="flex items-center gap-3 cursor-pointer group">
+                    <label
+                      key={opt}
+                      className="flex items-center gap-3 cursor-pointer group"
+                      onClick={() => toggleFilter(filterGroup.key, opt)}
+                    >
                       <div 
                         className={`w-5 h-5 flex items-center justify-center rounded-md border transition-colors ${
                           activeFilters[filterGroup.key] === opt 
@@ -245,7 +249,7 @@ export default function CatalogPage() {
                   title="Слушать"
                 >
                   <span className="group-hover:hidden tabular-nums font-medium">{index + 1}</span>
-                  <span className="hidden group-hover:inline font-bold text-lg drop-shadow-sm">▶</span>
+                  <svg className="hidden group-hover:block w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
                 </div>
                 
                 <Link href={`/tracks/${track.slug || track.id}`} className="w-12 h-12 bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden shrink-0 cursor-pointer block relative">

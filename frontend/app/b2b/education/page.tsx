@@ -94,7 +94,7 @@ export default function EducationPage() {
     <main className="min-h-screen pt-10 md:pt-14 pb-24 px-6 md:px-12 max-w-5xl mx-auto">
       <section
         className="relative rounded-3xl overflow-hidden p-8 md:p-12 text-white mb-8 md:mb-12"
-        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)' }}>
+        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #2f9e8f 55%, #e6e6e6 100%)' }}>
         <div className="relative z-10 max-w-2xl">
           <div className="text-xs uppercase tracking-widest font-semibold mb-3 opacity-90">
             Учебным заведениям

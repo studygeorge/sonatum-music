@@ -5,6 +5,7 @@ import LiquidGlassNav from './components/LiquidGlassNav'
 import Footer from './components/Footer'
 import { CookieBanner } from './components/CookieBanner'
 import { PlayerProvider } from './context/PlayerContext'
+import { ToastProvider } from './components/Toast'
 
 const inter = Inter({ 
   subsets: ['latin', 'cyrillic'],
@@ -38,6 +39,7 @@ export const metadata: Metadata = {
 import Player from './components/Player'
 import PlayerPaddingWrapper from './components/PlayerPaddingWrapper'
 import GrainientBackground from './components/GrainientBackground'
+import ScrollToTop from './components/ScrollToTop'
 
 export default function RootLayout({
   children,
@@ -51,7 +53,8 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} min-h-screen flex flex-col`} style={{ background: 'transparent' }}>
         <GrainientBackground />
-        <PlayerProvider>
+        <ToastProvider><PlayerProvider>
+          <ScrollToTop />
           <LiquidGlassNav />
           <PlayerPaddingWrapper>
             <div className="pb-8">
@@ -61,7 +64,7 @@ export default function RootLayout({
           <Footer />
           <Player />
           <CookieBanner />
-        </PlayerProvider>
+        </PlayerProvider></ToastProvider>
       </body>
     </html>
   )

@@ -7,6 +7,7 @@ import { api } from '@/app/lib/api';
 import { authStorage } from '@/app/lib/auth';
 import Link from 'next/link';
 
+import { toast } from '@/app/components/Toast';
 // Тот же красивый full-screen viewer, что используется на странице трека.
 // dynamic + ssr:false — react-pdf требует canvas/DOMMatrix.
 const SheetMusicViewer = dynamic(
@@ -69,9 +70,9 @@ export default function SheetViewerPage({ params }: { params: { id: string } }) 
         window.location.href = j.paymentUrl;
         return;
       }
-      alert(j?.error || 'Не удалось перейти к оплате');
+      toast.error(j?.error || 'Не удалось перейти к оплате');
     } catch {
-      alert('Ошибка сети');
+      toast.error('Ошибка сети');
     }
   };
 

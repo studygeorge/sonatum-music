@@ -4,6 +4,15 @@ import React, { createContext, useContext, useState, useRef, useEffect, ReactNod
 import { Track } from '../types';
 import { api } from '@/app/lib/api';
 
+export type QueueContext = {
+  // Список треков плейлиста/альбома/региона. Если не передан — играем "из общего" (рандом).
+  tracks?: Track[];
+  // Индекс начального трека в tracks (если есть). Если -1 — найдём по id.
+  index?: number;
+  // Источник — для отладки/UI
+  source?: string;
+};
+
 interface PlayerContextType {
   currentTrack: Track | null;
   isPlaying: boolean;
@@ -11,8 +20,9 @@ interface PlayerContextType {
   duration: number;
   volume: number;
   isCollapsed: boolean;
+  shuffleMode: boolean;
   setIsCollapsed: (v: boolean) => void;
-  playTrack: (track: Track) => void;
+  playTrack: (track: Track, ctx?: QueueContext) => void;
   togglePlay: () => void;
   pause: () => void;
   seek: (time: number) => void;
@@ -65,6 +75,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(1);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [shuffleMode, setShuffleMode] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastSavedRef = useRef<number>(0);
 
@@ -91,6 +102,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       };
       // currentTime можно ставить только когда метаданные загружены.
       audio.addEventListener('loadedmetadata', restorePos, { once: true });
+    } else {
+      // Первый заход / нет истории — подгружаем случайный трек, чтобы плеер
+      // был «готов к нажатию Play». Сам не запускаем — autoplay запрещён.
+      fetch('/api/tracks/random?limit=1')
+        .then((r) => r.json())
+        .then((j) => {
+          const tr = j?.data?.[0];
+          if (tr?.audioUrl) {
+            setCurrentTrack(tr);
+            audio.src = tr.audioUrl;
+            audio.preload = 'metadata';
+            persistTrack(tr);
+          }
+        })
+        .catch(() => {});
     }
 
     audio.addEventListener('timeupdate', () => {
@@ -111,23 +137,39 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setIsPlaying(false);
       setCurrentTime(0);
       persistPosition(0);
-      // Авто-переход к следующему треку из очереди (Hero «Слушать сейчас»).
+      // Авто-переход: если есть очередь — следующий по плейлисту (с закольцовкой),
+      // иначе — случайный трек из общего пула.
       try {
         const rawQ = localStorage.getItem('sonatum:queue');
         const rawI = localStorage.getItem('sonatum:queueIndex');
         if (rawQ && rawI != null) {
           const q = JSON.parse(rawQ);
-          const next = parseInt(rawI, 10) + 1;
-          if (Array.isArray(q) && q[next]) {
-            localStorage.setItem('sonatum:queueIndex', String(next));
-            // Имитируем playTrack без зависимости от внешнего скоупа
+          if (Array.isArray(q) && q.length > 0) {
+            let next = parseInt(rawI, 10) + 1;
+            if (next >= q.length) next = 0; // закольцовка
             const tr = q[next];
-            audio.src = tr.audioUrl;
-            persistTrack(tr);
-            setCurrentTrack(tr);
-            audio.play().then(() => setIsPlaying(true)).catch(() => {});
+            if (tr?.audioUrl) {
+              localStorage.setItem('sonatum:queueIndex', String(next));
+              audio.src = tr.audioUrl;
+              persistTrack(tr);
+              setCurrentTrack(tr);
+              audio.play().then(() => setIsPlaying(true)).catch(() => {});
+              return;
+            }
           }
         }
+        // Нет очереди — fetch random
+        fetch('/api/tracks/random?limit=1')
+          .then((r) => r.json())
+          .then((j) => {
+            const tr = j?.data?.[0];
+            if (tr?.audioUrl) {
+              audio.src = tr.audioUrl;
+              persistTrack(tr);
+              setCurrentTrack(tr);
+              audio.play().then(() => setIsPlaying(true)).catch(() => {});
+            }
+          }).catch(() => {});
       } catch {}
     });
 
@@ -158,7 +200,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const playTrack = (track: Track) => {
+  const playTrack = (track: Track, ctx?: QueueContext) => {
     if (!audioRef.current) return;
 
     setCurrentTrack(track);
@@ -168,12 +210,58 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     persistPosition(0);
     setCurrentTime(0);
 
+    // Сохраняем очередь, если передана. Иначе — снимаем очередь (next будет рандомным).
+    try {
+      if (ctx?.tracks && ctx.tracks.length > 0) {
+        let idx = ctx.index ?? -1;
+        if (idx < 0 || idx >= ctx.tracks.length || ctx.tracks[idx]?.id !== (track as any).id) {
+          idx = ctx.tracks.findIndex((t) => (t as any).id === (track as any).id);
+          if (idx < 0) idx = 0;
+        }
+        localStorage.setItem('sonatum:queue', JSON.stringify(ctx.tracks));
+        localStorage.setItem('sonatum:queueIndex', String(idx));
+        localStorage.setItem('sonatum:queueSource', ctx.source || '');
+      } else {
+        // Одиночный трек — очищаем очередь, чтобы next был случайным
+        localStorage.removeItem('sonatum:queue');
+        localStorage.removeItem('sonatum:queueIndex');
+        localStorage.setItem('sonatum:queueSource', 'random');
+      }
+    } catch {}
+
     audioRef.current.play()
       .then(() => setIsPlaying(true))
       .catch(error => {
         console.error('[PLAYER] Playback error:', error);
         setIsPlaying(false);
       });
+
+    // Запись в историю прослушиваний (без авторизации — игнорируем)
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('sonatum_token') : null;
+      if (token && (track as any).id) {
+        fetch('/api/users/me/history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ trackId: (track as any).id, durationSec: (track as any).duration }),
+        }).catch(() => {});
+      }
+    } catch {}
+  };
+
+  // Подгружаем случайный трек (если играем НЕ из плейлиста)
+  const playRandomNext = async () => {
+    try {
+      const curId = (currentTrack as any)?.id;
+      const r = await fetch(`/api/tracks/random?limit=1${curId ? `&exclude=${encodeURIComponent(curId)}` : ''}`);
+      const j = await r.json();
+      const tr = j?.data?.[0];
+      if (tr?.audioUrl) {
+        playTrack(tr); // без ctx → останется в random-режиме
+      }
+    } catch (e) {
+      console.error('[PLAYER] random fetch error:', e);
+    }
   };
 
   const togglePlay = () => {
@@ -215,20 +303,98 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Есть ли активная очередь (плейлист/альбом/регион)?
+  const hasActiveQueue = (): boolean => {
+    try {
+      const q = localStorage.getItem('sonatum:queue');
+      if (!q) return false;
+      const arr = JSON.parse(q);
+      return Array.isArray(arr) && arr.length > 0;
+    } catch { return false; }
+  };
+
+  // Переходим к треку из очереди (localStorage). delta: +1 next, -1 previous.
+  // Возвращает true если переход состоялся.
+  const jumpInQueue = (delta: 1 | -1): boolean => {
+    if (!audioRef.current) return false;
+    try {
+      const rawQ = localStorage.getItem('sonatum:queue');
+      const rawI = localStorage.getItem('sonatum:queueIndex');
+      if (!rawQ || rawI == null) return false;
+      const q = JSON.parse(rawQ);
+      if (!Array.isArray(q) || q.length === 0) return false;
+      const curIdx = parseInt(rawI, 10);
+      let target = curIdx + delta;
+      // Закольцовываем плейлист: после последнего → первый, перед первым → последний
+      if (target >= q.length) target = 0;
+      if (target < 0) target = q.length - 1;
+      const tr = q[target];
+      if (!tr || !tr.audioUrl) return false;
+      localStorage.setItem('sonatum:queueIndex', String(target));
+      audioRef.current.src = tr.audioUrl;
+      persistTrack(tr);
+      setCurrentTrack(tr);
+      persistPosition(0);
+      setCurrentTime(0);
+      audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      return true;
+    } catch (e) {
+      console.error('[PLAYER] jumpInQueue error:', e);
+      return false;
+    }
+  };
+
   const skipNext = () => {
-    console.log('[PLAYER] Skip next - TODO: implement playlist');
+    // Сначала пробуем перейти внутри активной очереди (плейлиста)
+    if (hasActiveQueue() && jumpInQueue(1)) return;
+    // Иначе — берём случайный трек
+    playRandomNext();
   };
 
   const skipPrevious = () => {
-    console.log('[PLAYER] Skip previous - TODO: implement playlist');
+    // Если воспроизведение идёт >3 сек — просто перематываем на начало
+    if (audioRef.current && audioRef.current.currentTime > 3) {
+      audioRef.current.currentTime = 0;
+      setCurrentTime(0);
+      persistPosition(0);
+      return;
+    }
+    // Если плейлист — переходим назад. Иначе — нечего "назад", оставляем как есть.
+    if (hasActiveQueue()) {
+      jumpInQueue(-1);
+      return;
+    }
+    // Без плейлиста — previous эквивалентен «новому случайному»
+    playRandomNext();
   };
 
   const toggleShuffle = async () => {
     try {
-      const res = await api.shuffleQueue();
-      if (res.success) {
-        console.log('[PLAYER] Queue shuffled');
+      const rawQ = localStorage.getItem('sonatum:queue');
+      if (rawQ) {
+        // Есть очередь (плейлист) — перемешиваем её, оставляя текущий трек первым
+        const q = JSON.parse(rawQ);
+        if (Array.isArray(q) && q.length > 1) {
+          const curIdx = parseInt(localStorage.getItem('sonatum:queueIndex') || '0', 10);
+          const cur = q[curIdx];
+          const rest = q.filter((_: any, i: number) => i !== curIdx);
+          for (let i = rest.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [rest[i], rest[j]] = [rest[j], rest[i]];
+          }
+          const shuffled = [cur, ...rest];
+          localStorage.setItem('sonatum:queue', JSON.stringify(shuffled));
+          localStorage.setItem('sonatum:queueIndex', '0');
+          setShuffleMode((m) => !m);
+          console.log('[PLAYER] Queue shuffled locally');
+        }
+      } else {
+        // Нет очереди — играем случайный трек прямо сейчас
+        setShuffleMode(true);
+        await playRandomNext();
       }
+      // И серверная очередь (если есть)
+      api.shuffleQueue?.().catch(() => {});
     } catch (e) {
       console.error(e);
     }
@@ -262,6 +428,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         duration,
         volume,
         isCollapsed,
+        shuffleMode,
         setIsCollapsed,
         playTrack,
         togglePlay,

@@ -3,10 +3,30 @@ import { prisma } from '@/lib/prisma';
 import { AuthService } from '@/lib/auth';
 import { getCorsHeaders } from '@/lib/cors';
 import { init as tinkoffInit } from '@/lib/tinkoff';
+import { sendMail } from '@/lib/mailer';
 
+import { logError } from '@/lib/errors';
 export const dynamic = 'force-dynamic';
 
 const SITE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sonatum-music.ru';
+
+const PROJECT_TYPE_LABEL: Record<string, string> = {
+  AD: 'Рекламный ролик',
+  FILM: 'Фильм',
+  SERIES: 'Сериал',
+  GAME: 'Видеоигра',
+  PODCAST: 'Подкаст',
+  EVENT: 'Корпоративное мероприятие',
+  PRESENTATION: 'Презентация',
+  OTHER: 'Другое',
+};
+
+const BUDGET_LABEL: Record<string, string> = {
+  UNDER_10K: 'До 10 000 ₽',
+  '10_30K': '10 000 — 30 000 ₽',
+  '30_70K': '30 000 — 70 000 ₽',
+  OVER_70K: 'Свыше 70 000 ₽',
+};
 
 function cuid() {
   return 'lp_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 12);
@@ -30,7 +50,7 @@ export async function POST(request: NextRequest) {
     let body: any;
     try { body = await request.json(); } catch { body = {}; }
 
-    const { trackId, licenseCode, buyerEmail, buyerName, buyerCompany, projectDescription } = body;
+    const { trackId, licenseCode, buyerEmail, buyerName, buyerCompany, projectDescription, projectType, budget, buyerPhone } = body;
     if (!trackId || !licenseCode) {
       return NextResponse.json(
         { success: false, error: 'Не указан трек или тип лицензии' },
@@ -104,8 +124,9 @@ export async function POST(request: NextRequest) {
     await prisma.$executeRawUnsafe(
       `INSERT INTO license_purchases
        (id, buyer_id, buyer_email, buyer_name, buyer_company, track_id, license_code,
-        price, commission_pct, commission_amount, artist_amount, status, project_description)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        price, commission_pct, commission_amount, artist_amount, status, project_description,
+        project_type, budget)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
       lpId,
       userId,
       actualEmail,
@@ -118,8 +139,61 @@ export async function POST(request: NextRequest) {
       commissionAmount,
       artistAmount,
       isExclusive ? 'EXCLUSIVE_REQUESTED' : requiresManager ? 'AWAITING_MANAGER' : 'PENDING',
-      projectDescription || null
+      projectDescription || null,
+      projectType && PROJECT_TYPE_LABEL[projectType] ? projectType : null,
+      budget && BUDGET_LABEL[budget] ? budget : null
     );
+
+    // Email-уведомления для AWAITING_MANAGER / EXCLUSIVE_REQUESTED
+    if (requiresManager || isExclusive) {
+      const managerTo = process.env.SONATUM_B2B_EMAIL || process.env.SONATUM_BILLING_EMAIL || 'b2b@sonatum-music.ru';
+      const projectTypeLabel = projectType ? PROJECT_TYPE_LABEL[projectType] || projectType : '—';
+      const budgetLabel = budget ? BUDGET_LABEL[budget] || budget : '—';
+      const trackInfo = `«${track.title}»${track.artist?.name ? ' — ' + track.artist.name : ''}`;
+      // 1) Менеджеру
+      sendMail({
+        to: managerTo,
+        subject: isExclusive
+          ? `[Сонатум · Эксклюзив] Запрос исключительной лицензии — ${trackInfo}`
+          : `[Сонатум · B2B] ${lic.short_name || lic.name} — ${trackInfo}`,
+        html: `
+          <h2>${isExclusive ? 'Запрос исключительной лицензии' : 'Новая B2B-заявка'}</h2>
+          <p><b>ID заявки:</b> ${lpId}</p>
+          <p><b>Трек:</b> ${trackInfo}</p>
+          <p><b>Тип лицензии:</b> ${lic.name}<br>
+             <b>Тип проекта:</b> ${projectTypeLabel}<br>
+             <b>Бюджет:</b> ${budgetLabel}</p>
+          <p><b>Контактное лицо:</b> ${buyerName || '—'}<br>
+             <b>Компания:</b> ${buyerCompany || '—'}<br>
+             <b>Email:</b> <a href="mailto:${actualEmail}">${actualEmail}</a><br>
+             <b>Телефон:</b> ${buyerPhone || '—'}</p>
+          ${projectDescription ? `<p><b>Описание проекта:</b><br>${String(projectDescription).replace(/\n/g, '<br>')}</p>` : ''}
+          ${isExclusive ? '<p><em>Платформа не участвует в сделке — только передаёт ваш запрос автору. Свяжите автора и покупателя.</em></p>' : ''}
+          <hr>
+          <p style="color:#888;font-size:12px">Открыть заявку: <a href="${SITE_URL}/admin/inquiries">/admin/inquiries</a></p>
+        `,
+      }).catch(() => {});
+
+      // 2) Подтверждение клиенту
+      sendMail({
+        to: actualEmail,
+        subject: isExclusive
+          ? 'Сонатум: ваш запрос на исключительные права принят'
+          : `Сонатум: ваша заявка на лицензию принята`,
+        html: `
+          <h2>Заявка принята в работу</h2>
+          <p>Здравствуйте${buyerName ? ', ' + buyerName : ''}!</p>
+          <p>Мы получили вашу заявку на ${isExclusive ? 'исключительные права на трек' : 'лицензирование трека'} <b>${trackInfo}</b>.</p>
+          ${isExclusive
+            ? '<p>«Сонатум» не продаёт исключительные права. Мы передаём ваш запрос автору. Если он согласится — он свяжется с вами напрямую.</p>'
+            : `<p>Менеджер свяжется с вами в течение 1 рабочего дня по адресу <b>${actualEmail}</b> для уточнения деталей: территории, срока использования, типа медиа.</p>
+               <p>После согласования вы получите индивидуальный лицензионный договор, счёт на оплату и (после оплаты) файл с треком в высоком качестве с подписанным договором.</p>`}
+          <p>ID вашей заявки: <code>${lpId}</code></p>
+          <hr>
+          <p style="color:#888;font-size:12px">Это автоматическое уведомление с платформы «Сонатум».</p>
+        `,
+      }).catch(() => {});
+    }
 
     if (isExclusive) {
       return NextResponse.json(
@@ -157,20 +231,16 @@ export async function POST(request: NextRequest) {
       email: actualEmail,
       successUrl: `${SITE_URL}/tracks/${track.slug}?paid=1`,
       failUrl: `${SITE_URL}/tracks/${track.slug}?paid=0`,
+      notificationUrl: `${SITE_URL}/api/payments/tinkoff/notify`,
       receipt: {
-        items: [
-          {
-            name: description.substring(0, 128),
-            quantity: 1,
-            amount: amountKopecks,
-            price: amountKopecks,
-            tax: 'none',
-            paymentMethod: 'full_payment',
-            paymentObject: 'service',
-          },
-        ],
+        items: [{
+          name: description.substring(0, 128),
+          priceKopecks: amountKopecks,
+          quantity: 1,
+        }],
+        taxation: 'usn_income',
       },
-    } as any);
+    });
 
     if (!r?.ok || !r.paymentUrl) {
       return NextResponse.json(
@@ -197,7 +267,7 @@ export async function POST(request: NextRequest) {
       { headers: corsHeaders }
     );
   } catch (e: any) {
-    console.error('[LICENSE_INIT_ERR]', e);
+    logError('payments.license-init', e, { request, extra: { tag: 'LICENSE_INIT_ERR' } }).catch(()=>{}); console.error('[LICENSE_INIT_ERR]', e);
     return NextResponse.json(
       { success: false, error: e?.message || 'Ошибка' },
       { status: 500, headers: corsHeaders }

@@ -281,7 +281,7 @@ function SheetCard({ sheet }: { sheet: Sheet }) {
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[#0039a6]/10 to-[#d52b1e]/10" />
+            <div className="w-full h-full bg-gradient-to-br from-[#0039a6]/10 to-[#2f9e8f]/10" />
           )}
         </div>
 

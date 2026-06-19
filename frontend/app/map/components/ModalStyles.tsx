@@ -536,7 +536,7 @@ export default function ModalStyles() {
       }
 
       .works-title::before {
-        content: '🎵';
+        content: '';
         font-size: 20px;
       }
 

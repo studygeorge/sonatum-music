@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { AuthService } from '@/lib/auth';
+import { isProfiAuthor } from '@/lib/subscription';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,6 +74,9 @@ export async function GET(
       isFollowing = !!follow;
     }
 
+    // ПРОФИ-статус автора (бейдж в публичном профиле)
+    const isProfi = artist.userId ? await isProfiAuthor(artist.userId) : false;
+
     const transformedArtist = {
       ...artist,
       genres: artist.genres.map(ag => ag.genre),
@@ -82,6 +86,7 @@ export async function GET(
       })),
       totalPlays: totalPlays._sum.playCount || 0,
       isFollowing,
+      isProfi,
     };
 
     return NextResponse.json({ success: true, data: transformedArtist });

@@ -77,8 +77,9 @@ export async function PATCH(
        rights_confirmed = COALESCE($13, rights_confirmed),
        allow_donations = COALESCE($14, allow_donations),
        allow_exclusive = COALESCE($15, allow_exclusive),
+       "isExplicit" = COALESCE($16, "isExplicit"),
        "updatedAt" = now()
-     WHERE id = $16`,
+     WHERE id = $17`,
     body.contentType || null,
     body.originalComposer || null,
     body.recordingYear || null,
@@ -94,8 +95,17 @@ export async function PATCH(
     body.rightsConfirmed ?? null,
     body.allowDonations ?? null,
     body.allowExclusive ?? null,
+    body.isExplicit ?? null,
     params.id
   );
+
+  // Соавторы и состав исполнителей сохраняем в metadata JSON
+  if (body.coAuthors !== undefined || body.performers !== undefined) {
+    const meta: any = (track as any).metadata || {};
+    if (body.coAuthors !== undefined) meta.coAuthors = body.coAuthors;
+    if (body.performers !== undefined) meta.performers = body.performers;
+    await prisma.track.update({ where: { id: params.id }, data: { metadata: meta } });
+  }
 
   // Sheet music — если передали sheetUrl и нет существующего
   if (body.sheetUrl) {

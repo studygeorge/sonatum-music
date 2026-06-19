@@ -38,14 +38,20 @@ async function getHandler(
       );
     }
 
-    // Извлечем активную подписку
+    // Извлечем активную подписку — только ACTIVE статус с не истёкшим endDate
     const subscription = await prisma.subscription.findUnique({ where: { userId: user.id as string } });
-    const isPremium = user.role === 'PREMIUM' || user.role === 'ADMIN' || (subscription && ['PREMIUM', 'STUDENT'].includes(subscription.tier));
+    const subActive =
+      !!subscription &&
+      subscription.status === 'ACTIVE' &&
+      ['PREMIUM', 'STUDENT'].includes(subscription.tier) &&
+      (!subscription.endDate || new Date(subscription.endDate) > new Date());
+    const isPremium =
+      user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || subActive;
 
-    // Проверка прав (например, только Premium или купившие могут скачать)
-    if (!isPremium && sheet.price && Number(sheet.price) > 0) {
+    // Доступ к нотам — только Premium-подписчикам
+    if (!isPremium) {
       return NextResponse.json(
-        { success: false, error: 'Требуется подписка Premium или покупка' },
+        { success: false, error: 'Требуется активная подписка Premium' },
         { status: 403, headers: corsHeaders }
       );
     }

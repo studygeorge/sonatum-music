@@ -38,7 +38,7 @@ export default async function EventsPage() {
     <main className="min-h-screen pt-10 md:pt-14 pb-24 px-6 md:px-12 max-w-7xl mx-auto space-y-10">
       <section
         className="relative rounded-3xl overflow-hidden p-10 md:p-14 text-white"
-        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)' }}>
+        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #2f9e8f 55%, #e6e6e6 100%)' }}>
         <div className="relative z-10 max-w-2xl">
           <div className="text-xs uppercase tracking-widest font-semibold mb-3 opacity-90">
             Афиша
@@ -75,7 +75,7 @@ export default async function EventsPage() {
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-[#1d4cb8]/15 to-[#d52b1e]/15 flex items-center justify-center text-5xl">
+                    <div className="w-full h-full bg-gradient-to-br from-[#1d4cb8]/15 to-[#2f9e8f]/15 flex items-center justify-center text-5xl">
                     </div>
                   )}
                   <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-md rounded-full px-3 py-1 text-xs font-bold tabular-nums">

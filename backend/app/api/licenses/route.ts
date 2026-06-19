@@ -14,7 +14,7 @@ export async function OPTIONS(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const cors = getCorsHeaders(request.headers.get('origin') || undefined);
   const rows = (await prisma.$queryRawUnsafe(
-    `SELECT id, code, name, short_name, audience, description, rights_allowed, rights_forbidden, territory, default_price, min_price, max_price, commission_pct, is_b2b, requires_manager, sort_order
+    `SELECT id, code, name, short_name, audience, description, rights_allowed, rights_forbidden, territory, default_price, min_price, max_price, commission_pct, is_b2b, requires_manager, sort_order, period_days
      FROM license_catalog WHERE active = true ORDER BY sort_order ASC, name ASC`
   )) as any[];
 
@@ -38,8 +38,7 @@ export async function GET(request: NextRequest) {
         isB2B: r.is_b2b,
         requiresManager: r.requires_manager,
         sortOrder: r.sort_order,
+        periodDays: r.period_days ? Number(r.period_days) : null,
       })),
-    },
-    { headers: cors }
-  );
+    }, { headers: { ...cors, 'Cache-Control': 's-maxage=3600, stale-while-revalidate=7200' } });
 }

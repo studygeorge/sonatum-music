@@ -42,7 +42,7 @@ export default async function ChartPage() {
         className="relative rounded-3xl overflow-hidden p-10 md:p-14 text-white"
         style={{
           background:
-            'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)',
+            'linear-gradient(135deg, #1d4cb8 0%, #2f9e8f 55%, #e6e6e6 100%)',
         }}
       >
         <div
@@ -51,7 +51,7 @@ export default async function ChartPage() {
         />
         <div
           className="absolute bottom-0 left-1/3 w-80 h-80 rounded-full blur-3xl opacity-30"
-          style={{ background: '#e84545', transform: 'translateY(40%)' }}
+          style={{ background: '#3aa8c9', transform: 'translateY(40%)' }}
         />
         <div className="relative z-10 max-w-2xl">
           <div className="text-white text-xs uppercase tracking-widest font-semibold mb-4 opacity-90 drop-shadow-[0_1px_4px_rgba(0,0,0,0.25)]">

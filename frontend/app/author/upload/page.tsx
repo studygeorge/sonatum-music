@@ -94,6 +94,26 @@ export default function UploadWizardPage() {
   const [instruments, setInstruments] = useState<string[]>([]);
   const [difficulty, setDifficulty] = useState('');
   const [tempo, setTempo] = useState('');
+  const [isExplicit, setIsExplicit] = useState(false);
+  const [coAuthors, setCoAuthors] = useState<Array<{ nickname: string; name: string; role: string }>>([]);
+  const [performers, setPerformers] = useState<Array<{ name: string; instrument: string }>>([]);
+  const [genresList, setGenresList] = useState<string[]>(GENRES);
+
+  // Подгружаем актуальный список жанров из БД (вместо хардкода)
+  useEffect(() => {
+    fetch('/api/genres')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.success && Array.isArray(j.data)) {
+          const names = (j.data as any[])
+            .map((g) => g.name)
+            .filter((n) => typeof n === 'string')
+            .sort((a, b) => a.localeCompare(b, 'ru'));
+          if (names.length > 0) setGenresList(names);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Шаг 3 — текст, ноты, монетизация
   const [lyrics, setLyrics] = useState('');
@@ -255,6 +275,7 @@ export default function UploadWizardPage() {
         audioType,
         instrumentalUrl: minusUrl || undefined,
         instrumentalPrice: minusUrl ? minusPrice : undefined,
+        isExplicit,
       };
       const tr = await fetch('/api/tracks', {
         method: 'POST',
@@ -287,6 +308,13 @@ export default function UploadWizardPage() {
           instruments: instruments.length > 0 ? instruments : null,
           difficulty: difficulty || null,
           tempo: tempo || null,
+          isExplicit,
+          coAuthors: coAuthors.filter(c => c.nickname || c.name).length > 0
+            ? coAuthors.filter(c => c.nickname || c.name)
+            : null,
+          performers: performers.filter(p => p.name).length > 0
+            ? performers.filter(p => p.name)
+            : null,
           hasMinus: !!minusUrl,
           minusAudioUrl: minusUrl || null,
           minusPrice: minusUrl ? minusPrice : null,
@@ -296,7 +324,7 @@ export default function UploadWizardPage() {
           sheetUrl: sheetUrl || null,
           region: region || null,
         }),
-      }).catch(() => {}); // не блокируем основное создание
+      }).catch(() => {});
 
       // 7. Лицензии — не блокируем основное создание, если не сохранятся
       const licsList = Object.entries(selectedLicenses)
@@ -327,7 +355,7 @@ export default function UploadWizardPage() {
       <section
         className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white"
         style={{
-          background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)',
+          background: 'linear-gradient(135deg, #1d4cb8 0%, #2f9e8f 55%, #e6e6e6 100%)',
         }}>
         <div className="relative z-10 max-w-2xl">
           <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-90">
@@ -495,7 +523,7 @@ export default function UploadWizardPage() {
                   className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-white outline-none focus:ring-2 focus:ring-[var(--accent)] text-sm"
                 >
                   <option value="">Выберите жанр</option>
-                  {GENRES.map((g) => (
+                  {genresList.map((g) => (
                     <option key={g} value={g}>{g}</option>
                   ))}
                 </select>
@@ -600,6 +628,146 @@ export default function UploadWizardPage() {
                   />
                 </div>
               )}
+
+              {/* Фильтр 18+ (по ТЗ) */}
+              <div>
+                <label className="flex items-start gap-2.5 cursor-pointer p-3 rounded-xl border border-[var(--border)] hover:bg-black/[0.02]">
+                  <input
+                    type="checkbox"
+                    checked={isExplicit}
+                    onChange={(e) => setIsExplicit(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-[var(--text-primary)]"
+                  />
+                  <span className="text-sm">
+                    <span className="font-semibold">Контент 18+</span> — нецензурная лексика, откровенные сцены или темы для взрослой аудитории. На карточке будет показан значок «18+».
+                  </span>
+                </label>
+              </div>
+
+              {/* Соавторы — только для оригиналов */}
+              {contentType !== 'COVER' && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium">Соавторы (если есть)</label>
+                    <button
+                      type="button"
+                      onClick={() => setCoAuthors([...coAuthors, { nickname: '', name: '', role: '' }])}
+                      className="text-xs font-semibold text-[var(--accent)]">
+                      + Добавить соавтора
+                    </button>
+                  </div>
+                  {coAuthors.length === 0 ? (
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      Например: @anna_sokolova · Анна Соколова (текст)
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {coAuthors.map((co, i) => (
+                        <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
+                          <input
+                            type="text"
+                            value={co.nickname}
+                            onChange={(e) => {
+                              const next = [...coAuthors];
+                              next[i].nickname = e.target.value;
+                              setCoAuthors(next);
+                            }}
+                            placeholder="@nickname"
+                            className="px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-sm"
+                          />
+                          <input
+                            type="text"
+                            value={co.name}
+                            onChange={(e) => {
+                              const next = [...coAuthors];
+                              next[i].name = e.target.value;
+                              setCoAuthors(next);
+                            }}
+                            placeholder="ФИО"
+                            className="px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-sm"
+                          />
+                          <select
+                            value={co.role}
+                            onChange={(e) => {
+                              const next = [...coAuthors];
+                              next[i].role = e.target.value;
+                              setCoAuthors(next);
+                            }}
+                            className="px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-sm">
+                            <option value="">Роль…</option>
+                            <option value="composer">Композитор</option>
+                            <option value="lyrics">Автор текста</option>
+                            <option value="arranger">Аранжировка</option>
+                            <option value="producer">Продюсер</option>
+                            <option value="sound">Звукорежиссёр</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => setCoAuthors(coAuthors.filter((_, j) => j !== i))}
+                            className="px-2 py-2 text-sm text-[var(--text-secondary)] hover:text-black">
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Состав исполнителей — только для кавера */}
+              {contentType === 'COVER' && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium">Состав исполнителей</label>
+                    <button
+                      type="button"
+                      onClick={() => setPerformers([...performers, { name: '', instrument: '' }])}
+                      className="text-xs font-semibold text-[var(--accent)]">
+                      + Добавить исполнителя
+                    </button>
+                  </div>
+                  {performers.length === 0 ? (
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      Например: Михаил Соколов (скрипка), Анна Новикова (фортепиано)
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {performers.map((p, i) => (
+                        <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                          <input
+                            type="text"
+                            value={p.name}
+                            onChange={(e) => {
+                              const next = [...performers];
+                              next[i].name = e.target.value;
+                              setPerformers(next);
+                            }}
+                            placeholder="ФИО"
+                            className="px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-sm"
+                          />
+                          <input
+                            type="text"
+                            value={p.instrument}
+                            onChange={(e) => {
+                              const next = [...performers];
+                              next[i].instrument = e.target.value;
+                              setPerformers(next);
+                            }}
+                            placeholder="Инструмент / партия"
+                            className="px-3 py-2 rounded-lg border border-[var(--border)] bg-white text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setPerformers(performers.filter((_, j) => j !== i))}
+                            className="px-2 py-2 text-sm text-[var(--text-secondary)] hover:text-black">
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex justify-between pt-3 border-t border-[var(--border)]">
               <button
@@ -682,7 +850,7 @@ export default function UploadWizardPage() {
             <div className="pt-3 border-t border-[var(--border)]">
               <h3 className="text-base font-semibold mb-2">Лицензии и монетизация</h3>
               <p className="text-xs text-[var(--text-secondary)] mb-4">
-                Выберите типы лицензий и цены. Комиссия платформы: 10% (обычные) / 20% (B2B) / 0% (донаты, эксклюзив).
+                Выберите типы лицензий и цены. Комиссия платформы: 10% (обычные) / 20% (B2B) / 0% (эксклюзив).
               </p>
               <div className="space-y-2">
                 {licenses.map((l) => {
@@ -749,15 +917,6 @@ export default function UploadWizardPage() {
                 })}
               </div>
               <div className="mt-4 grid sm:grid-cols-2 gap-2">
-                <label className="flex items-center gap-3 cursor-pointer px-4 py-3 rounded-xl border border-[var(--border)]">
-                  <input
-                    type="checkbox"
-                    checked={allowDonations}
-                    onChange={(e) => setAllowDonations(e.target.checked)}
-                    className="accent-[var(--text-primary)]"
-                  />
-                  <span className="text-sm">Принимать донаты <span className="text-xs text-[var(--text-secondary)]">(комиссия 0%)</span></span>
-                </label>
                 <label className="flex items-center gap-3 cursor-pointer px-4 py-3 rounded-xl border border-[var(--border)]">
                   <input
                     type="checkbox"

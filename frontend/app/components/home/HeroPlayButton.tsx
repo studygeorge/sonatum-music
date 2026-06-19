@@ -48,10 +48,15 @@ export default function HeroPlayButton({ tracks }: { tracks: Track[] }) {
       shimmerDuration="2.5s"
       background="rgba(255,255,255,0.18)"
       borderRadius="980px"
-      className="px-8 py-4 text-base font-semibold backdrop-blur-md border-white/30 cursor-pointer"
+      className="px-6 py-2.5 text-sm font-semibold backdrop-blur-md border-white/30 cursor-pointer"
       onClick={onPlay}
     >
-      ▶ Слушать сейчас
+      <span className="inline-flex items-center gap-2">
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+        Слушать сейчас
+      </span>
     </ShimmerButton>
   );
 }

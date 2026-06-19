@@ -37,12 +37,71 @@ function htmlToText(html: string): string {
     .trim();
 }
 
+// Lazy nodemailer transport (создаётся 1 раз)
+let _smtpTransporter: any = null;
+function getSmtpTransporter() {
+  if (_smtpTransporter) return _smtpTransporter;
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) return null;
+  // require, чтобы не падать на сборке если nodemailer не установлен
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const nodemailer = require("nodemailer");
+  const port = Number(process.env.SMTP_PORT || 465);
+  const secure = process.env.SMTP_SECURE !== "false";
+  // На reg.ru TLS-handshake с Docker-NAT нестабилен. Если SMTP_NO_TLS=1 — шлём plaintext.
+  const ignoreTLS = process.env.SMTP_NO_TLS === "1";
+  _smtpTransporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    ignoreTLS,
+    requireTLS: !ignoreTLS && !secure,
+    auth: { user, pass },
+    tls: {
+      // reg.ru / Exim поддерживает только TLSv1.2 (не v1.3)
+      minVersion: "TLSv1.2",
+      maxVersion: "TLSv1.2",
+      rejectUnauthorized: false,
+      servername: host,
+      ciphers: "DEFAULT@SECLEVEL=0",
+    },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
+    logger: process.env.SMTP_DEBUG === "1",
+    debug: process.env.SMTP_DEBUG === "1",
+  });
+  return _smtpTransporter;
+}
+
 export async function sendMail(payload: MailPayload): Promise<{ ok: boolean; provider: string; id?: string; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.MAIL_FROM || "Сонатум <noreply@sonatum-music.ru>";
+  const from = process.env.MAIL_FROM || "Сонатум <info@sonatum-music.ru>";
 
   const text = payload.text || (payload.html ? htmlToText(payload.html) : "");
 
+  // 1) Приоритет — SMTP (если настроен)
+  const smtp = getSmtpTransporter();
+  if (smtp) {
+    try {
+      const info = await smtp.sendMail({
+        from,
+        to: payload.to,
+        subject: payload.subject,
+        html: payload.html,
+        text,
+        replyTo: payload.replyTo,
+      });
+      return { ok: true, provider: "smtp", id: info?.messageId };
+    } catch (e: any) {
+      console.error("[MAIL:smtp]", e?.message || e);
+      return { ok: false, provider: "smtp", error: e?.message || "smtp error" };
+    }
+  }
+
+  // 2) Иначе Resend API
   if (!apiKey) {
     // Console fallback — не падаем, просто логируем.
     console.log(

@@ -84,9 +84,12 @@ class APIClient {
       console.log('[API] Response:', endpoint, data);
 
       if (!response.ok) {
+        // Передаём весь объект ошибки целиком, чтобы UI мог обработать спец-флаги
+        // (например, requires2FA, code: 'PLAYLIST_LIMIT_REACHED')
         return {
           success: false,
           error: data.error || 'Произошла ошибка',
+          data: data as any,
         };
       }
 
@@ -114,18 +117,35 @@ class APIClient {
     password: string,
     username: string,
     firstName?: string,
-    lastName?: string
+    lastName?: string,
+    extras?: {
+      role?: 'USER' | 'ARTIST';
+      regionId?: string;
+      agreedTerms?: boolean;
+      artistData?: {
+        name?: string;
+        slug?: string;
+        authorType?: 'COMPOSER' | 'PERFORMER' | 'BOTH' | 'AUTHOR';
+        isCollective?: boolean;
+      };
+    }
   ): Promise<ApiResponse<RegisterResponse>> {
     return this.request<RegisterResponse>('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, username, firstName, lastName }),
+      body: JSON.stringify({
+        email, password, username, firstName, lastName,
+        role: extras?.role,
+        regionId: extras?.regionId,
+        agreedTerms: extras?.agreedTerms,
+        artistData: extras?.artistData,
+      }),
     });
   }
 
-  async login(email: string, password: string): Promise<ApiResponse<LoginResponse>> {
+  async login(email: string, password: string, code?: string): Promise<ApiResponse<LoginResponse>> {
     return this.request<LoginResponse>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, code }),
     });
   }
 
@@ -276,6 +296,12 @@ class APIClient {
 
   async unlikeComment(commentId: string): Promise<ApiResponse<any>> {
     return this.request<any>(`/api/comments/${commentId}/like`, {
+      method: 'DELETE',
+    });
+  }
+
+  async deleteComment(commentId: string): Promise<ApiResponse<any>> {
+    return this.request<any>(`/api/comments/${commentId}`, {
       method: 'DELETE',
     });
   }

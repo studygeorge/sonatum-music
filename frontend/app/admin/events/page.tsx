@@ -83,7 +83,7 @@ export default function AdminEventsPage() {
     <main className="min-h-screen pt-6 md:pt-10 pb-20 px-4 md:px-8 max-w-7xl mx-auto space-y-6">
       <section
         className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white"
-        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)' }}>
+        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #2f9e8f 55%, #e6e6e6 100%)' }}>
         <div className="relative z-10 max-w-2xl">
           <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-90">
             Админ · События

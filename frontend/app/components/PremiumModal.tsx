@@ -61,6 +61,48 @@ export function PremiumModal({ open, onClose, feature }: PremiumModalProps) {
 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [trialEligible, setTrialEligible] = useState(false);
+  const [trialBusy, setTrialBusy] = useState(false);
+  const [trialBanner, setTrialBanner] = useState<string | null>(null);
+
+  // Узнаём, может ли пользователь взять пробный период
+  useEffect(() => {
+    if (!open) return;
+    const token = authStorage.getToken();
+    if (!token) return;
+    fetch('/api/payments/trial-start', { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.json())
+      .then((j) => setTrialEligible(!!j?.data?.eligible))
+      .catch(() => {});
+  }, [open]);
+
+  const startTrial = async () => {
+    setError('');
+    setTrialBusy(true);
+    try {
+      const token = authStorage.getToken();
+      if (!token) {
+        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+        return;
+      }
+      const res = await fetch('/api/payments/trial-start', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const j = await res.json();
+      if (j?.success) {
+        setTrialBanner(j.message || 'Пробный период активирован');
+        setTrialEligible(false);
+        setTimeout(() => { window.location.reload(); }, 1500);
+        return;
+      }
+      setError(j?.error || 'Не удалось активировать пробный период');
+    } catch (e: any) {
+      setError(e?.message || 'Ошибка сети');
+    } finally {
+      setTrialBusy(false);
+    }
+  };
 
   const handleSubscribe = async (tier: string, planId: string) => {
     setError("");
@@ -103,13 +145,23 @@ export function PremiumModal({ open, onClose, feature }: PremiumModalProps) {
       onClick={onClose}
     >
       <div
-        className="relative max-w-2xl w-full max-h-[92vh] overflow-y-auto rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,0.5)] text-white"
+        className="relative max-w-2xl w-full overflow-hidden rounded-3xl shadow-[0_30px_80px_rgba(0,0,0,0.5)] text-white"
         style={{
           background:
-            "linear-gradient(135deg, #1d4cb8 0%, #6a1bb3 35%, #c9285c 70%, #f06a2a 100%)",
+            "linear-gradient(135deg, #1d4cb8 0%, #2f9e8f 55%, #e6e6e6 100%)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Декоративные блики как в hero на главной */}
+        <div
+          className="pointer-events-none absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl opacity-35"
+          style={{ background: "#3a78dc", transform: "translate(30%, -30%)" }}
+        />
+        <div
+          className="pointer-events-none absolute bottom-0 left-1/3 w-80 h-80 rounded-full blur-3xl opacity-30"
+          style={{ background: "#3aa8c9", transform: "translateY(40%)" }}
+        />
+
         <button
           onClick={onClose}
           aria-label="Закрыть"
@@ -121,33 +173,58 @@ export function PremiumModal({ open, onClose, feature }: PremiumModalProps) {
         </button>
 
         {/* Hero */}
-        <div className="px-8 pt-12 pb-8 text-center">
-          <div className="text-[11px] tracking-[3px] uppercase font-bold opacity-90 mb-4 text-white">Сонатум Premium</div>
-          <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-3 text-white">
+        <div className="relative z-10 px-6 md:px-8 pt-8 md:pt-10 pb-4 md:pb-5 text-center">
+          <div className="text-[10px] md:text-[11px] tracking-[3px] uppercase font-bold opacity-90 mb-2 md:mb-3 text-white">Сонатум Premium</div>
+          <h2 className="text-2xl md:text-3xl font-black tracking-tight mb-2 text-white">
             {feature ? `${feature} — только для Premium` : "Полный доступ к Сонатум"}
           </h2>
-          <p className="text-[15px] text-white/90 max-w-md mx-auto">
+          <p className="text-[13px] md:text-[14px] text-white/90 max-w-md mx-auto">
             Поддержка авторов, без рекламы, скачивание в Hi-Res и доступ к редким архивам.
           </p>
         </div>
 
-        {/* Преимущества — на полупрозрачном фоне поверх градиента */}
-        <div className="px-6 md:px-10 pb-8">
-          <ul className="grid sm:grid-cols-2 gap-3 mb-8">
+        {/* Преимущества + тарифы */}
+        <div className="relative z-10 px-5 md:px-8 pb-5 md:pb-6">
+          <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5 mb-4 md:mb-5">
             {BENEFITS.map((b) => (
-              <li key={b} className="flex items-start gap-3 text-[14px] text-white">
-                <span className="mt-0.5 inline-flex w-5 h-5 rounded-full bg-white/20 text-white flex-shrink-0 items-center justify-center">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <li key={b} className="flex items-start gap-2 text-[12px] md:text-[13px] text-white">
+                <span className="mt-0.5 inline-flex w-4 h-4 rounded-full bg-white/20 text-white flex-shrink-0 items-center justify-center">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </span>
-                <span className="leading-relaxed">{b}</span>
+                <span className="leading-snug">{b}</span>
               </li>
             ))}
           </ul>
 
+          {/* 7-дневный пробный — даётся 1 раз на пользователя */}
+          {trialEligible && (
+            <div className="rounded-2xl border-2 border-white/40 bg-white/10 backdrop-blur p-3 mb-3 md:mb-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm text-white">Попробовать 7 дней бесплатно</div>
+                  <div className="text-xs text-white/80 mt-0.5">
+                    Полный Premium на неделю без оплаты. Без автопродления — потом нужно оформить заново.
+                  </div>
+                </div>
+                <button
+                  onClick={startTrial}
+                  disabled={trialBusy}
+                  className="px-4 py-2 rounded-full bg-white text-black text-xs font-bold whitespace-nowrap hover:opacity-90 disabled:opacity-60">
+                  {trialBusy ? 'Активируем…' : 'Активировать триал'}
+                </button>
+              </div>
+            </div>
+          )}
+          {trialBanner && (
+            <div className="rounded-2xl bg-white/15 border border-white/30 p-3 mb-3 text-sm text-white">
+              {trialBanner}
+            </div>
+          )}
+
           {/* Тарифы — белые карточки контрастом к градиенту */}
-          <div className="grid sm:grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-3 gap-2 md:gap-3 mb-3 md:mb-4">
             {PLANS.map((p) => {
               const loading = busy === p.id;
               return (
@@ -155,19 +232,19 @@ export function PremiumModal({ open, onClose, feature }: PremiumModalProps) {
                   key={p.id}
                   onClick={() => handleSubscribe(p.tier, p.id)}
                   disabled={loading || !!busy}
-                  className="text-left p-5 rounded-2xl bg-white text-gray-900 hover:shadow-2xl transition relative disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="text-left p-3 md:p-4 rounded-2xl bg-white text-gray-900 hover:shadow-2xl transition relative disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {p.badge && (
-                    <span className="absolute -top-2 right-4 px-2.5 py-0.5 rounded-full bg-black text-white text-[10px] font-bold tracking-wide uppercase">
+                    <span className="absolute -top-2 right-3 px-2 py-0.5 rounded-full bg-black text-white text-[9px] font-bold tracking-wide uppercase">
                       {p.badge}
                     </span>
                   )}
-                  <div className="text-[12px] uppercase tracking-wider text-gray-500 font-semibold">{p.title}</div>
-                  <div className="mt-2 text-[26px] font-extrabold text-gray-900 leading-none">{p.price}</div>
-                  <div className="text-[12px] text-gray-500 mt-1">{p.period}</div>
-                  <div className="text-[11px] text-gray-500 mt-3 leading-snug">{p.note}</div>
-                  <div className="mt-3 text-[12px] font-bold text-black">
-                    {loading ? 'Открываем оплату…' : 'Оформить →'}
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold">{p.title}</div>
+                  <div className="mt-1.5 text-[20px] md:text-[22px] font-extrabold text-gray-900 leading-none">{p.price}</div>
+                  <div className="text-[10px] text-gray-500 mt-1">{p.period}</div>
+                  <div className="text-[10px] text-gray-500 mt-2 leading-snug">{p.note}</div>
+                  <div className="mt-2 text-[11px] font-bold text-black">
+                    {loading ? 'Открываем…' : 'Оформить →'}
                   </div>
                 </button>
               );
@@ -175,12 +252,12 @@ export function PremiumModal({ open, onClose, feature }: PremiumModalProps) {
           </div>
 
           {error && (
-            <div className="mb-4 rounded-xl bg-white/10 border border-white/30 px-4 py-3 text-sm text-white">
+            <div className="mb-2 rounded-xl bg-white/10 border border-white/30 px-3 py-2 text-xs text-white">
               {error}
             </div>
           )}
 
-          <p className="text-[11px] text-center text-white/80">
+          <p className="text-[10px] text-center text-white/80 leading-snug">
             Нажимая «Оформить», вы соглашаетесь с{" "}
             <a href="/legal/terms" className="underline hover:text-white">офертой</a>,{" "}
             <a href="/legal/privacy" className="underline hover:text-white">политикой конфиденциальности</a> и{" "}

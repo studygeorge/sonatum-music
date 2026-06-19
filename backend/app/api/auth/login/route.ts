@@ -4,6 +4,7 @@ import { PasswordService } from '@/lib/password';
 import { AuthService } from '@/lib/auth';
 import { getCorsHeaders } from '@/lib/cors';
 
+import { checkRateLimit, rateLimitResponse } from '@/lib/ratelimit';
 export async function OPTIONS(request: NextRequest) {
   const origin = request.headers.get('origin');
   const headers = getCorsHeaders(origin || undefined);
@@ -11,6 +12,8 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const _rl = checkRateLimit('login', request, { max: 5, windowSec: 60 });
+  if (!_rl.ok) return rateLimitResponse(_rl, request) as any;
   const origin = request.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin || undefined);
 
@@ -69,8 +72,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ipAddress = request.headers.get('x-forwarded-for') || 
-                      request.headers.get('x-real-ip') || 
+    // === 2FA проверка ===
+    const [twoFA] = (await prisma.$queryRawUnsafe(
+      `SELECT totp_enabled, totp_secret, totp_backup_codes FROM users WHERE id = $1`,
+      user.id
+    )) as any[];
+
+    if (twoFA?.totp_enabled && twoFA?.totp_secret) {
+      const code = String((await request.clone().json().catch(() => ({})))?.code || '').replace(/\s+/g, '');
+      if (!code) {
+        return NextResponse.json(
+          { success: false, error: 'Требуется код двухфакторной аутентификации', requires2FA: true },
+          { status: 401, headers: corsHeaders }
+        );
+      }
+
+      // Сначала пробуем как TOTP (6 цифр)
+      let codeValid = false;
+      if (/^\d{6}$/.test(code)) {
+        const otplib = await import('otplib');
+        codeValid = otplib.verifySync({ token: code, secret: twoFA.totp_secret, strategy: 'totp' }).valid;
+      }
+
+      // Если не TOTP — пробуем как backup-код (XXXX-XXXX)
+      if (!codeValid && /^[A-F0-9]{4}-[A-F0-9]{4}$/i.test(code)) {
+        const codes = Array.isArray(twoFA.totp_backup_codes) ? twoFA.totp_backup_codes : [];
+        const codeUp = code.toUpperCase();
+        const idx = codes.findIndex((c: any) => c.code === codeUp && !c.used);
+        if (idx >= 0) {
+          codes[idx].used = true;
+          codes[idx].usedAt = new Date().toISOString();
+          await prisma.$executeRawUnsafe(
+            `UPDATE users SET totp_backup_codes = $1::jsonb WHERE id = $2`,
+            JSON.stringify(codes), user.id
+          );
+          codeValid = true;
+        }
+      }
+
+      if (!codeValid) {
+        return NextResponse.json(
+          { success: false, error: 'Неверный код двухфакторной аутентификации', requires2FA: true },
+          { status: 403, headers: corsHeaders }
+        );
+      }
+    }
+
+    const ipAddress = request.headers.get('x-forwarded-for') ||
+                      request.headers.get('x-real-ip') ||
                       'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
 

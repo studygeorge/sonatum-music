@@ -7,6 +7,7 @@ import { authStorage } from '@/app/lib/auth';
 import { api } from '@/app/lib/api';
 import Link from 'next/link';
 
+import { toast } from '@/app/components/Toast';
 type AuthorSub = {
   tier: string;
   status: string;
@@ -21,14 +22,9 @@ function AuthorSettingsPageInner() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  // Открыть подтверждение
-  const handleLogout = () => setShowLogoutConfirm(true);
-
-  // Реальный выход после подтверждения
-  const confirmLogout = async () => {
-    setShowLogoutConfirm(false);
+  // Мгновенный выход без подтверждения
+  const handleLogout = async () => {
     try { await (api as any).logout?.(); } catch {}
     authStorage.clear();
     window.location.href = '/';
@@ -56,7 +52,7 @@ function AuthorSettingsPageInner() {
       });
       const j = await r.json();
       if (!j.success) {
-        alert(j.error || 'Ошибка');
+        toast.error(j.error || 'Ошибка');
         return;
       }
       if (j.paymentUrl) window.location.href = j.paymentUrl;
@@ -72,7 +68,7 @@ function AuthorSettingsPageInner() {
     <div className="space-y-6 animate-fadeInUp">
       <section
         className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white"
-        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)' }}>
+        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #2f9e8f 55%, #e6e6e6 100%)' }}>
         <div className="relative z-10 max-w-2xl">
           <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-90">
             Настройки автора
@@ -149,7 +145,6 @@ function AuthorSettingsPageInner() {
           title="Стандартная цена трека"
           desc="99 ₽ (можно поменять при загрузке)"
         />
-        <SettingPlaceholder title="Приём донатов" desc="Включено по умолчанию, комиссия 0%" />
         <SettingPlaceholder
           title="Запросы на эксклюзив"
           desc="Появится кнопка «Запросить исключительную лицензию» на странице трека"
@@ -158,19 +153,11 @@ function AuthorSettingsPageInner() {
           Скоро: возможность менять глобальные значения здесь.
         </p>
       </section>
-      {/* Приватность */}
-      <section className="apple-card p-6 md:p-8">
-        <h2 className="text-xl font-bold tracking-tight mb-2">Приватность для B2B-запросов</h2>
-        <p className="text-sm text-[var(--text-secondary)] mb-5">
-          Как бизнес-клиенты могут связаться с вами по поводу эксклюзивных лицензий.
-        </p>
-        <SettingPlaceholder title="Показывать мои контакты (email)" desc="Покупатель свяжется напрямую" />
-        <SettingPlaceholder title="Только анонимная форма" desc="Сообщение придёт через платформу" />
-        <SettingPlaceholder
-          title="Не получать запросы на эксклюзив"
-          desc="Кнопка «Запросить исключительную» не показывается"
-        />
-      </section>
+      {/* Приватность исключительных лицензий */}
+      <ExclusivePrivacy />
+
+      {/* Чёрный список */}
+      <BlockedUsers />
 
       {/* Выход из аккаунта */}
       <section className="apple-card p-6 md:p-8">
@@ -186,25 +173,6 @@ function AuthorSettingsPageInner() {
         </button>
       </section>
 
-      {showLogoutConfirm && (
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md"
-          onClick={() => setShowLogoutConfirm(false)}
-        >
-          <div className="apple-card max-w-sm w-full p-6 shadow-2xl animate-fadeInUp" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-xl font-bold tracking-tight mb-2">Выход из аккаунта</h3>
-            <p className="text-sm text-[var(--text-secondary)] mb-6">Вы уверены, что хотите выйти?</p>
-            <div className="flex gap-2">
-              <button onClick={() => setShowLogoutConfirm(false)} className="flex-1 px-4 py-3 rounded-xl font-medium bg-[var(--hover)] hover:bg-[var(--border)] transition-colors">
-                Отмена
-              </button>
-              <button onClick={confirmLogout} className="flex-1 px-4 py-3 rounded-xl font-medium text-white bg-black hover:bg-gray-800 transition-colors">
-                Выйти
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -241,5 +209,174 @@ export default function AuthorSettingsPage() {
     <Suspense fallback={<div className="text-sm text-[var(--text-secondary)] py-6">Загрузка…</div>}>
       <AuthorSettingsPageInner />
     </Suspense>
+  );
+}
+
+const EXCLUSIVE_MODES = [
+  { v: 'SHOW_CONTACTS', label: 'Показывать мои контакты', desc: 'Покупатель свяжется напрямую (email/телефон/Telegram). Платформа в переговорах не участвует.' },
+  { v: 'ANONYMOUS', label: 'Только анонимная форма', desc: 'Сообщение придёт вам через платформу. Email скрыт до момента ответа.' },
+  { v: 'DISABLED', label: 'Не получать такие запросы', desc: 'Кнопка «Запросить исключительную лицензию» не показывается на ваших треках.' },
+];
+
+function ExclusivePrivacy() {
+  const [mode, setMode] = useState<string>('ANONYMOUS');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [telegram, setTelegram] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [banner, setBanner] = useState<string | null>(null);
+
+  const token = () => authStorage.getToken() || '';
+
+  useEffect(() => {
+    fetch('/api/author/me', { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.json())
+      .then(j => {
+        if (j.success && j.data?.artist) {
+          setMode(j.data.artist.exclusiveMode || 'ANONYMOUS');
+          setEmail(j.data.artist.exclusiveContactEmail || '');
+          setPhone(j.data.artist.exclusiveContactPhone || '');
+          setTelegram(j.data.artist.exclusiveContactTelegram || '');
+        }
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    setBanner(null);
+    try {
+      const r = await fetch('/api/author/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({
+          exclusiveMode: mode,
+          exclusiveContactEmail: email.trim() || null,
+          exclusiveContactPhone: phone.trim() || null,
+          exclusiveContactTelegram: telegram.trim() || null,
+        }),
+      });
+      const j = await r.json();
+      if (j.success) {
+        setBanner('Настройки сохранены');
+        setTimeout(() => setBanner(null), 2500);
+      }
+    } finally { setSaving(false); }
+  };
+
+  if (loading) return <div className="apple-card p-6 text-sm text-[var(--text-secondary)]">Загрузка настроек приватности…</div>;
+
+  return (
+    <section className="apple-card p-6 md:p-8">
+      <div className="flex items-center justify-between mb-2 gap-3 flex-wrap">
+        <h2 className="text-xl font-bold tracking-tight">Приватность исключительных запросов</h2>
+        {banner && <span className="text-xs text-[var(--text-secondary)]">{banner}</span>}
+      </div>
+      <p className="text-sm text-[var(--text-secondary)] mb-5">
+        Как бизнес-клиенты могут связаться с вами по поводу <b>исключительных лицензий</b>.
+        Платформа не продаёт эксклюзивные права — только передаёт ваш контакт или сообщение.
+      </p>
+
+      <div className="space-y-2 mb-5">
+        {EXCLUSIVE_MODES.map((m) => (
+          <label key={m.v}
+            className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+              mode === m.v ? 'border-black bg-black/[0.03]' : 'border-[var(--border)] bg-white hover:border-[var(--text-primary)]'
+            }`}>
+            <input type="radio" checked={mode === m.v} onChange={() => setMode(m.v)} className="mt-1" />
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-sm">{m.label}</div>
+              <div className="text-xs text-[var(--text-secondary)] mt-0.5 leading-snug">{m.desc}</div>
+            </div>
+          </label>
+        ))}
+      </div>
+
+      {mode === 'SHOW_CONTACTS' && (
+        <div className="grid sm:grid-cols-3 gap-3 mb-5">
+          <Field label="Email для запросов" value={email} onChange={setEmail} type="email" />
+          <Field label="Телефон" value={phone} onChange={setPhone} type="tel" />
+          <Field label="Telegram (@username)" value={telegram} onChange={setTelegram} />
+        </div>
+      )}
+
+      <button onClick={save} disabled={saving}
+        className="px-5 py-2.5 rounded-full bg-[var(--text-primary)] text-white text-sm font-medium disabled:opacity-60">
+        {saving ? 'Сохраняем…' : 'Сохранить'}
+      </button>
+    </section>
+  );
+}
+
+function BlockedUsers() {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const token = () => authStorage.getToken() || '';
+
+  const load = () => {
+    setLoading(true);
+    fetch('/api/users/me/blocks', { headers: { Authorization: `Bearer ${token()}` } })
+      .then(r => r.json())
+      .then(j => { if (j.success) setItems(j.data || []); })
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const unblock = async (userId: string) => {
+    if (!confirm('Убрать из чёрного списка?')) return;
+    await fetch(`/api/users/me/blocks?userId=${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    load();
+  };
+
+  return (
+    <section className="apple-card p-6 md:p-8">
+      <h2 className="text-xl font-bold tracking-tight mb-2">Чёрный список</h2>
+      <p className="text-sm text-[var(--text-secondary)] mb-5">
+        Заблокированные пользователи не видят ваши заявки в коллаборациях и не могут вам писать.
+      </p>
+      {loading ? (
+        <p className="text-sm text-[var(--text-secondary)]">Загрузка…</p>
+      ) : items.length === 0 ? (
+        <p className="text-sm text-[var(--text-secondary)]">Список пуст.</p>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((u) => (
+            <li key={u.id} className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border)]">
+              <div className="w-9 h-9 rounded-full bg-black/[0.06] flex items-center justify-center text-sm font-bold">
+                {(u.name?.[0] || u.username?.[0] || '?').toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-sm truncate">{u.name}</div>
+                <div className="text-xs text-[var(--text-secondary)] truncate">{u.email}</div>
+              </div>
+              <button onClick={() => unblock(u.userId)}
+                className="px-3 py-1.5 rounded-full bg-white border border-[var(--border)] text-xs font-semibold hover:bg-gray-100">
+                Разблокировать
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function Field({
+  label, value, onChange, type = 'text',
+}: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-1.5 block">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[var(--border)] focus:border-black focus:outline-none text-sm"
+      />
+    </label>
   );
 }

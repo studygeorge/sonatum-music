@@ -23,7 +23,9 @@ export async function GET(
   const cors = getCorsHeaders(request.headers.get('origin') || undefined);
   const rows = (await prisma.$queryRawUnsafe(
     `SELECT tl.license_code, tl.enabled, tl.price, tl.custom_terms,
-            lc.name, lc.short_name, lc.audience, lc.description, lc.default_price, lc.commission_pct, lc.is_b2b, lc.requires_manager
+            lc.name, lc.short_name, lc.audience, lc.description,
+            lc.rights_allowed, lc.rights_forbidden, lc.territory,
+            lc.default_price, lc.commission_pct, lc.is_b2b, lc.requires_manager
      FROM track_licenses tl
      JOIN license_catalog lc ON lc.code = tl.license_code
      WHERE tl.track_id = $1 AND tl.enabled = true
@@ -40,6 +42,9 @@ export async function GET(
         shortName: r.short_name,
         audience: r.audience,
         description: r.description,
+        rightsAllowed: Array.isArray(r.rights_allowed) ? r.rights_allowed : [],
+        rightsForbidden: Array.isArray(r.rights_forbidden) ? r.rights_forbidden : [],
+        territory: r.territory || 'Мир',
         price: r.price ? Number(r.price) : Number(r.default_price),
         commissionPct: r.commission_pct,
         isB2B: r.is_b2b,

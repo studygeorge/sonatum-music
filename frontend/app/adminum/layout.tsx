@@ -62,7 +62,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="p-4 border-t border-[var(--border)]">
              <button 
                onClick={handleLogout}
-               className="w-full text-left px-4 py-3 rounded-xl font-medium text-red-500 hover:bg-red-50 transition-colors"
+               className="w-full text-left px-4 py-3 rounded-xl font-medium text-[var(--text-primary)] hover:bg-[var(--hover)] transition-colors"
              >
                Выйти из Админки
              </button>
@@ -73,7 +73,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="flex-grow flex flex-col">
           <header className="h-16 bg-white border-b border-[var(--border)] flex items-center px-6 justify-between md:hidden">
              <Link href="/adminum" className="font-bold text-xl tracking-tight text-[var(--text-primary)]">Sonatum Admin</Link>
-             <button onClick={handleLogout} className="text-sm font-medium text-red-500">Выйти</button>
+             <button onClick={handleLogout} className="text-sm font-medium text-[var(--text-primary)]">Выйти</button>
           </header>
           <main className="flex-grow p-6 md:p-8 overflow-y-auto w-full relative">
             <div className="max-w-5xl mx-auto">

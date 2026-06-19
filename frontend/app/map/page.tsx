@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 // @ts-ignore
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from 'react-simple-maps';
 import { usePlayer } from '@/context/PlayerContext';
+import Link from 'next/link';
 import { geoCentroid } from 'd3-geo';
 
 const geoUrl = "https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/russia.geojson";
@@ -54,8 +55,6 @@ const REGION_FIELDS = [
   { key: 'projects', title: 'Современные проекты' },
 ];
 
-type RegionMeta = { id: string; name: string; slug: string; type?: string };
-
 export default function MapPage() {
   const [selectedRegion, setSelectedRegion] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -63,81 +62,79 @@ export default function MapPage() {
   const [isAnimating, setIsAnimating] = useState(false);
   const { playTrack } = usePlayer();
 
-  const [regionsData, setRegionsData] = useState<RegionMeta[]>([]);
+  const [regionsData, setRegionsData] = useState<any[]>([]);
   const [mapScale, setMapScale] = useState(520);
 
+  // На мобильном при открытой панели региона прячем нижнее меню, чтобы оно не перекрывало.
   useEffect(() => {
+    const hidden = !!selectedRegion;
+    window.dispatchEvent(new CustomEvent('sonatum:nav-visibility', { detail: { hidden } }));
+    return () => window.dispatchEvent(new CustomEvent('sonatum:nav-visibility', { detail: { hidden: false } }));
+  }, [selectedRegion]);
+
+  useEffect(() => {
+    // В реальном проекте запрос к /api/map/regions
+    
+    // Set initial scale based on viewport
     if (typeof window !== 'undefined') {
       setMapScale(window.innerWidth >= 768 ? 750 : 550);
+      
       const handleResize = () => setMapScale(window.innerWidth >= 768 ? 750 : 550);
       window.addEventListener('resize', handleResize);
       return () => window.removeEventListener('resize', handleResize);
     }
   }, []);
 
-  // Подгружаем реальный список регионов из БД (для подсветки/поиска по имени).
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/map/regions');
-        const json = await res.json();
-        if (!cancelled && json?.success && Array.isArray(json.data)) {
-          setRegionsData(
-            json.data.map((r: any) => ({
-              id: r.id,
-              name: r.name,
-              slug: r.slug,
-              type: r.type,
-            }))
-          );
-        }
-      } catch (e) {
-        console.error('[map] failed to load regions list', e);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    setTimeout(() => {
+      setRegionsData([
+        { id: '1', name: 'Москва', slug: 'moscow', coordinates: [37.6173, 55.7558], type: 'РФ', historicalData: { shortDescription: 'Центр формирования знаменного распева и партесного пения.' } },
+        { id: '2', name: 'Архангельская область', slug: 'arkhangelsk', coordinates: [40.5285, 64.5399], type: 'область', historicalData: { shortDescription: 'Сохранение древнейших форм северного фольклора и былин.' }, isLocked: true },
+        { id: '3', name: 'Ярославская область', slug: 'yaroslavl', coordinates: [39.8737, 57.6261], type: 'область', historicalData: { shortDescription: 'Родина уникальных традиций колокольного звона (Ростов Великий).' } },
+        { id: '4', name: 'Республика Крым', slug: 'crimea', coordinates: [34.1030, 45.2828], type: 'республика', historicalData: { shortDescription: 'Наследие византийских певческих традиций и уникальный фольклор.' } },
+        { id: '5', name: 'Севастополь', slug: 'sevastopol', coordinates: [33.5224, 44.6166], type: 'город', historicalData: { shortDescription: 'Мощные традиции исторических морских и военных оркестров.' } },
+        { id: '6', name: 'Калининградская область', slug: 'kaliningrad', coordinates: [20.4853, 54.7104], type: 'область', historicalData: { shortDescription: 'Уникальное пересечение западноевропейской классики и русской культуры.' } },
+      ]);
+      setLoading(false);
+    }, 600);
   }, []);
 
   const handleRegionClick = async (regionConfig: any) => {
     setIsAnimating(true);
-    if (regionConfig.coordinates) {
-      setPosition({ coordinates: regionConfig.coordinates, zoom: 3 });
-    }
+    setPosition({ coordinates: regionConfig.coordinates, zoom: 3 });
     setTimeout(() => setIsAnimating(false), 700);
-
-    // Бэк ищет по slug → name → fuzzy contains, поэтому передаём name из geojson.
-    const key = encodeURIComponent(regionConfig.slug || regionConfig.name);
-
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const token = localStorage.getItem('token');
       const headers: any = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const response = await fetch(`/api/map/regions/${key}`, { headers });
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Ищем регион в БД по имени/слагу (id в локальном списке — условный, в БД его нет).
+      const regionKey = regionConfig.name || regionConfig.slug || regionConfig.id;
+      const response = await fetch(`/api/map/regions/${encodeURIComponent(regionKey)}`, { headers });
       const json = await response.json();
-
+      
       if (json.success) {
         setSelectedRegion(json.data);
       } else {
+        // Fallback for mocked markers that don't exist in DB yet
         setSelectedRegion({
           ...regionConfig,
-          historicalData: null,
+          historicalData: {
+            shortDescription: 'Регион не найден в базе данных. Это демо-заглушка.'
+          }
         });
       }
     } catch (e) {
       console.error(e);
-      setSelectedRegion({ ...regionConfig, historicalData: null });
+      setSelectedRegion(regionConfig);
     }
   };
 
   return (
-    <main className="absolute inset-0 pt-[140px] md:pt-[100px] pb-[100px] md:pb-[140px] px-0 md:px-6 w-full flex flex-col overflow-hidden z-0">
-
+    <main className="absolute inset-0 pt-[80px] md:pt-[100px] pb-[100px] md:pb-[140px] px-0 md:px-6 w-full flex flex-col overflow-hidden z-0">
+      
       {/* Заголовок страницы (Вне карты) */}
       <div className="shrink-0 mb-4 md:mb-6 px-6 md:px-0 z-10 w-full relative">
         <h1 className="text-3xl lg:text-4xl font-bold tracking-tight mb-1 text-[var(--text-primary)]">Музыкальная карта</h1>
@@ -146,18 +143,18 @@ export default function MapPage() {
 
       {/* Контейнер для карты и сайдбара */}
       <div className="flex-grow flex flex-col md:flex-row min-h-0 relative w-full">
-
+        
         {/* Главная часть: Карта */}
         <div className="flex-grow relative flex items-center justify-center">
 
         {loading ? (
           <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)]">Загрузка карты...</div>
         ) : (
-          <div
+          <div 
             className={`w-full h-full absolute inset-0 pt-20 flex items-center justify-center px-0 ${isAnimating ? '[&_g]:transition-transform [&_g]:duration-700 [&_g]:ease-in-out' : ''}`}
             style={{ touchAction: 'none' }}
           >
-            <ComposableMap
+            <ComposableMap 
               projection="geoAzimuthalEqualArea"
               projectionConfig={{
                 rotate: mapScale >= 750 ? [-95, -66, 0] : [-95, -64, 0],
@@ -175,39 +172,29 @@ export default function MapPage() {
                     geographies.map((geo) => {
                       const geoName = geo.properties.name || geo.properties.NAME_1 || geo.properties.name_ru || "";
                       const baseColor = getColorForRegion(geoName);
-
+                      
                       return (
                         <Geography
                           key={geo.rsmKey}
                           geography={geo}
                           onClick={() => {
+                            const match = regionsData.find(r => r.name === geoName);
                             const centroid = geoCentroid(geo);
-                            // Сначала точное совпадение, потом подстрока
-                            // ("Татарстан" в geojson ↔ "Республика Татарстан" в БД).
-                            const match =
-                              regionsData.find(r => r.name === geoName) ||
-                              regionsData.find(
-                                r =>
-                                  r.name.toLowerCase().includes(geoName.toLowerCase()) ||
-                                  geoName.toLowerCase().includes(r.name.toLowerCase())
-                              );
-
-                            const config = match
-                              ? { ...match, coordinates: centroid as [number, number] }
-                              : {
-                                  name: geoName,
-                                  slug: undefined,
-                                  type: 'Регион',
-                                  coordinates: centroid as [number, number],
-                                };
-
-                            handleRegionClick(config);
+                            
+                            if (match) {
+                              handleRegionClick(match);
+                            } else {
+                              setIsAnimating(true);
+                              setPosition({ coordinates: centroid as [number, number], zoom: 3 });
+                              setTimeout(() => setIsAnimating(false), 700);
+                              handleRegionClick({ id: encodeURIComponent(geoName), name: geoName, type: 'Регион', coordinates: centroid as [number, number] });
+                            }
                           }}
                           className="focus:outline-none outline-none cursor-pointer"
                           style={{
-                            default: {
-                              fill: selectedRegion && selectedRegion.name === geoName ? "var(--accent)" : baseColor,
-                              stroke: "#FFFFFF",
+                            default: { 
+                              fill: selectedRegion && selectedRegion.name === geoName ? "var(--accent)" : baseColor, 
+                              stroke: "#FFFFFF", 
                               strokeWidth: 0.5
                             },
                             hover: { fill: "#B8C9E1", stroke: "#FFFFFF", strokeWidth: 0.5 },
@@ -228,35 +215,29 @@ export default function MapPage() {
                         const geoName = geo.properties.region === 'Автономна Республіка Крим' ? 'Республика Крым' : 'Севастополь';
                         const customGeo = { ...geo, properties: { ...geo.properties, name: geoName } };
                         const baseColor = getColorForRegion(geoName);
-
+                        
                         return (
                           <Geography
                             key={customGeo.rsmKey}
                             geography={customGeo}
                             onClick={() => {
+                              const match = regionsData.find(r => r.name === geoName);
                               const centroid = geoCentroid(customGeo);
-                              const match =
-                                regionsData.find(r => r.name === geoName) ||
-                                regionsData.find(
-                                  r =>
-                                    r.name.toLowerCase().includes(geoName.toLowerCase()) ||
-                                    geoName.toLowerCase().includes(r.name.toLowerCase())
-                                );
-                              const config = match
-                                ? { ...match, coordinates: centroid as [number, number] }
-                                : {
-                                    name: geoName,
-                                    slug: undefined,
-                                    type: 'Регион',
-                                    coordinates: centroid as [number, number],
-                                  };
-                              handleRegionClick(config);
+                              
+                              if (match) {
+                                handleRegionClick(match);
+                              } else {
+                                setIsAnimating(true);
+                                setPosition({ coordinates: centroid as [number, number], zoom: 3 });
+                                setTimeout(() => setIsAnimating(false), 700);
+                                handleRegionClick({ id: encodeURIComponent(geoName), name: geoName, type: 'Регион', coordinates: centroid as [number, number] });
+                              }
                             }}
                             className="focus:outline-none outline-none cursor-pointer"
                             style={{
-                              default: {
-                                fill: selectedRegion && selectedRegion.name === geoName ? "var(--accent)" : baseColor,
-                                stroke: "#FFFFFF",
+                              default: { 
+                                fill: selectedRegion && selectedRegion.name === geoName ? "var(--accent)" : baseColor, 
+                                stroke: "#FFFFFF", 
                                 strokeWidth: 0.5
                               },
                               hover: { fill: "#B8C9E1", stroke: "#FFFFFF", strokeWidth: 0.5 },
@@ -272,6 +253,20 @@ export default function MapPage() {
           </div>
         )}
       </div>
+
+      {/* Подложка: тап вне панели закрывает раздел (только мобильный) */}
+      {selectedRegion && (
+        <div
+          className="fixed inset-0 z-[95] md:hidden"
+          aria-hidden="true"
+          onClick={() => {
+            setSelectedRegion(null);
+            setIsAnimating(true);
+            setPosition({ coordinates: [95, 62], zoom: 1 });
+            setTimeout(() => setIsAnimating(false), 700);
+          }}
+        />
+      )}
 
       {/* Сайдбар (Историческая справка и треки) */}
       <div
@@ -295,15 +290,19 @@ export default function MapPage() {
                 <span className="text-xs font-semibold tracking-wider text-[var(--accent)] uppercase mb-1 md:mb-2 block">
                   {selectedRegion.type}
                 </span>
-                <h2 className="text-2xl md:text-3xl font-bold">{selectedRegion.name}</h2>
-                {selectedRegion.historicalData?.summary && (
-                  <p className="mt-3 text-[var(--text-secondary)] text-sm leading-relaxed">
-                    {selectedRegion.historicalData.summary}
-                  </p>
+                <h2 className="text-2xl md:text-3xl font-bold mb-3">{selectedRegion.name}</h2>
+                {selectedRegion.slug && (
+                  <Link
+                    href={`/map/${selectedRegion.slug}`}
+                    className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-[var(--text-primary)] text-white font-semibold text-sm hover:opacity-90 transition-opacity"
+                  >
+                    Подробнее о регионе →
+                  </Link>
                 )}
               </div>
               <button
-                className="apple-button-secondary px-3 py-1 text-sm md:hidden hidden"
+                aria-label="Закрыть"
+                className="shrink-0 p-2 -mr-1 rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hover)] transition-colors"
                 onClick={() => {
                   setSelectedRegion(null);
                   setIsAnimating(true);
@@ -311,12 +310,14 @@ export default function MapPage() {
                   setTimeout(() => setIsAnimating(false), 700);
                 }}
               >
-                Закрыть
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
 
             <div className="flex flex-col gap-4 text-[var(--text-secondary)] text-sm leading-relaxed pb-8">
-              {/* 15 структурированных полей по ТЗ КАРТА.docx */}
+              {/* Рендеринг всех подготовленных полей */}
               {REGION_FIELDS.map(field => {
                 const content = selectedRegion.historicalData?.[field.key];
                 if (!content) return null;
@@ -330,44 +331,41 @@ export default function MapPage() {
                 );
               })}
 
-              {/* Если структурированных полей нет, но есть shortDescription */}
+              {/* Универсальный fallback: если структурированных данных нет, но есть shortDescription */}
               {(!REGION_FIELDS.some(f => selectedRegion.historicalData?.[f.key])) && selectedRegion.historicalData?.shortDescription && (
                 <section className="bg-black/5 dark:bg-white/5 rounded-2xl p-4 md:p-5 border border-[var(--border)] shadow-sm">
                   <h3 className="text-[15px] font-bold text-[var(--text-primary)] mb-2 flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" /> Историческая справка
                   </h3>
                   <p className="opacity-90 whitespace-pre-line">{selectedRegion.historicalData.shortDescription}</p>
+
+                  {/* Опциональный псевдо-лок для премиума (как было в старом дизайне) */}
+                  {selectedRegion.isLocked && (
+                    <div className="mt-4 pt-4 border-t border-[var(--border)] text-center">
+                      <p className="font-medium text-[var(--text-primary)] mb-3">Полная справка доступна по подписке</p>
+                      <button className="apple-button w-full text-xs">Оформить Premium</button>
+                    </div>
+                  )}
                 </section>
               )}
 
-              {/* Если данных вообще нет */}
+              {/* Если вообще нет данных */}
               {!selectedRegion.historicalData && (
                 <div className="bg-black/5 dark:bg-white/5 p-4 rounded-2xl italic text-sm text-center">
-                  Историческая справка по этому региону скоро появится.
+                  Система готова к загрузке этнографических и исторических данных для данного региона.
                 </div>
-              )}
-
-              {/* Источник */}
-              {selectedRegion.historicalData?.source && (
-                <p className="text-xs text-[var(--text-secondary)] italic opacity-70 px-1">
-                  Источник: {selectedRegion.historicalData.source}
-                </p>
               )}
             </div>
 
-            {/* Авторы региона */}
-            {selectedRegion.artists && selectedRegion.artists.length > 0 && (
+            {/* Представители (Артисты) */}
+            {selectedRegion.artists && (
               <div className="mb-8">
-                <h3 className="font-semibold text-lg mb-4">Авторы региона</h3>
+                <h3 className="font-semibold text-lg mb-4">Представители традиции</h3>
                 <div className="flex flex-wrap gap-3">
                   {selectedRegion.artists.map((artist: any) => (
-                    <a
-                      key={artist.id}
-                      href={`/artist/${artist.slug || artist.id}`}
-                      className="px-4 py-2 border border-[var(--border)] rounded-full text-sm font-medium hover:bg-[var(--hover)] transition-colors"
-                    >
+                    <span key={artist.id} className="px-4 py-2 border border-[var(--border)] rounded-full text-sm font-medium hover:bg-[var(--hover)] cursor-pointer transition-colors">
                       {artist.name}
-                    </a>
+                    </span>
                   ))}
                 </div>
               </div>
@@ -379,14 +377,12 @@ export default function MapPage() {
                 <h3 className="font-semibold text-lg mb-4">Музыка региона</h3>
                 <div className="flex flex-col gap-2">
                   {selectedRegion.tracks.map((track: any) => (
-                    <div
-                      key={track.id}
+                    <div 
+                      key={track.id} 
                       className="flex items-center gap-4 p-3 rounded-xl hover:bg-[var(--hover)] cursor-pointer group"
                       onClick={() => playTrack(track)}
                     >
-                      <div className="w-10 h-10 bg-[var(--border)] rounded-md shrink-0 flex items-center justify-center font-bold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
-                        ▶
-                      </div>
+                      <div className="w-10 h-10 bg-[var(--border)] rounded-md shrink-0 flex items-center justify-center font-bold text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg></div>
                       <div className="flex-grow min-w-0">
                         <h4 className="font-medium text-[var(--text-primary)] truncate text-sm">{track.title}</h4>
                         <p className="text-xs text-[var(--text-secondary)] truncate">{track.artist?.name}</p>
@@ -406,7 +402,7 @@ export default function MapPage() {
           </div>
         )}
       </div>
-
+      
       </div> {/* Конец контейнера контента */}
 
     </main>

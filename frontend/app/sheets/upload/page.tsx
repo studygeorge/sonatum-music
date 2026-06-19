@@ -94,7 +94,7 @@ export default function SheetUploadPage() {
   if (done) return (
     <main className="min-h-screen pt-28 pb-20 px-4 flex items-center justify-center">
       <div className="text-center max-w-sm">
-        <div className="text-6xl mb-4">🎼</div>
+        <div className="mb-4 flex justify-center"><svg className="w-12 h-12 text-[var(--text-secondary)]" fill="none" stroke="currentColor" strokeWidth={1.6} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg></div>
         <h1 className="text-2xl font-black text-[#1c1c1e] mb-2">Ноты отправлены!</h1>
         <p className="text-[var(--text-secondary)] text-[14px] mb-6">После модерации они появятся на странице трека.</p>
         <button onClick={() => router.back()} className="px-6 py-2.5 rounded-full bg-[#1c1c1e] text-white text-[13px] font-semibold hover:opacity-80 transition-opacity">← Вернуться</button>
@@ -108,7 +108,7 @@ export default function SheetUploadPage() {
         ← {step > 1 ? 'Назад' : 'Отмена'}
       </button>
 
-      <h1 className="text-3xl font-black tracking-tight text-[#1c1c1e] mb-1">🎼 Загрузка нот</h1>
+      <h1 className="text-3xl font-black tracking-tight text-[#1c1c1e] mb-1">Загрузка нот</h1>
       <p className="text-[13px] text-[var(--text-secondary)] mb-7">Поделитесь нотной версией со слушателями Сонатума</p>
 
       <StepIndicator />
@@ -200,7 +200,7 @@ export default function SheetUploadPage() {
                 onClick={() => scoreRef.current?.click()}
                 className={`mt-2 flex items-center gap-3 px-5 py-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${scoreFile ? 'border-green-400 bg-green-50' : 'border-[var(--border)] hover:border-[#1c1c1e] bg-white/50'}`}
               >
-                <span className="text-2xl">{scoreFile ? '✅' : '📄'}</span>
+                <span>{scoreFile ? (<svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>) : (<svg className="w-6 h-6 text-[var(--text-secondary)]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M14 3v5h5M9 13h6m-6 4h6M7 21h10a2 2 0 002-2V8l-5-5H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>)}</span>
                 <div>
                   <p className="font-semibold text-[13px] text-[#1c1c1e]">{scoreFile ? scoreFile.name : 'Выбрать PDF-файл'}</p>
                   <p className="text-[11px] text-[var(--text-secondary)]">{scoreFile ? `${(scoreFile.size / 1024 / 1024).toFixed(2)} МБ` : 'PDF · до 50 МБ'}</p>
@@ -217,7 +217,7 @@ export default function SheetUploadPage() {
                       placeholder="Инструмент"
                       className="flex-1 px-3 py-2.5 rounded-xl border border-[var(--border)] text-[13px] outline-none focus:border-[#1c1c1e] transition-colors bg-white/80" />
                     <label className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer text-[12px] transition-all flex-shrink-0 ${part.file ? 'border-green-400 bg-green-50 text-green-700' : 'border-[var(--border)] hover:border-[#1c1c1e] text-[var(--text-secondary)] bg-white/50'}`}>
-                      📎 {part.file ? part.file.name.slice(0, 12) + '…' : 'PDF'}
+                      <span className="inline-flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20 13" /></svg>{part.file ? part.file.name.slice(0, 12) + '…' : 'PDF'}</span>
                       <input type="file" accept=".pdf" className="hidden" onChange={e => updatePart(i, 'file', e.target.files?.[0] || null)} />
                     </label>
                     <button onClick={() => removePart(i)} className="mt-2 text-gray-400 hover:text-red-400 transition-colors text-lg leading-none">×</button>
@@ -238,11 +238,11 @@ export default function SheetUploadPage() {
             <h2 className="text-[18px] font-black text-[#1c1c1e]">Настройки и права</h2>
 
             <div className="bg-amber-50 border border-amber-200/70 rounded-2xl p-5">
-              <p className="text-[13px] font-bold text-amber-800 mb-1">⚡ Защита через Сонатум</p>
+              <p className="text-[13px] font-bold text-amber-800 mb-1 inline-flex items-center gap-1.5"><svg className="w-4 h-4 inline-block align-[-2px]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7" /></svg>Защита через Сонатум</p>
               <ul className="text-[12px] text-amber-700 space-y-1.5 mt-2">
-                <li>📋 Лицензионный договор-оферта фиксирует ваши права</li>
-                <li>💧 Водяные знаки встраиваются при скачивании</li>
-                <li>🏷 Метаданные автора встроены в файл</li>
+                <li className="flex items-start gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5l5 5v11a2 2 0 01-2 2z" /></svg><span>Лицензионный договор-оферта фиксирует ваши права</span></li>
+                <li className="flex items-start gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3s6 6.5 6 11a6 6 0 11-12 0c0-4.5 6-11 6-11z" /></svg><span>Водяные знаки встраиваются при скачивании</span></li>
+                <li className="flex items-start gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5a2 2 0 011.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A2 2 0 013 9V4a1 1 0 011-1z" /></svg><span>Метаданные автора встроены в файл</span></li>
                 <li>⏱ Дата загрузки зафиксирована как первое опубликование</li>
               </ul>
             </div>
@@ -273,8 +273,8 @@ export default function SheetUploadPage() {
         {/* Navigation */}
         <div className="flex justify-between mt-8 pt-6 border-t border-[var(--border)]">
           <div className="text-[11px] text-[var(--text-secondary)] self-center">
-            {step === 1 && title && <span>📄 {title}</span>}
-            {step === 2 && scoreFile && <span>✅ {scoreFile.name}</span>}
+            {step === 1 && title && <span className="inline-flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M14 3v5h5M7 21h10a2 2 0 002-2V8l-5-5H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>{title}</span>}
+            {step === 2 && scoreFile && <span className="inline-flex items-center gap-1.5"><svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>{scoreFile.name}</span>}
           </div>
           {step < 3 ? (
             <button

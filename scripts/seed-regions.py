@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 """
 Seed 85 субъектов РФ в таблицу `regions`.
 
@@ -34,7 +35,7 @@ from urllib.error import HTTPError, URLError
 import psycopg2
 
 DB = dict(host="127.0.0.1", port=5432, dbname="sonatum_music",
-          user="sonatum_user", password="Sonatum_Music_2026_Strong_Pass")
+          user="sonatum_user", password=os.getenv("PGPASSWORD",""))
 USER_AGENT = "SonatumImporter/1.0 (https://sonatum-music.ru; info@sonatum-music.ru)"
 
 # 15 ключей соответствуют REGION_FIELDS в /map/page.tsx — frontend читает

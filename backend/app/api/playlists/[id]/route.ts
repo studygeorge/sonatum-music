@@ -8,8 +8,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const playlist = await prisma.playlist.findUnique({
-      where: { id: params.id },
+    // Ищем по id или slug — фронт может передать любое
+    const playlist = await prisma.playlist.findFirst({
+      where: { OR: [{ id: params.id }, { slug: params.id }] },
       include: {
         user: {
           select: {
@@ -100,8 +101,8 @@ export async function PATCH(
 ) {
   return withAuth(request, async (req, session) => {
     try {
-      const playlist = await prisma.playlist.findUnique({
-        where: { id: params.id }
+      const playlist = await prisma.playlist.findFirst({
+        where: { OR: [{ id: params.id }, { slug: params.id }] }
       });
 
       if (!playlist) {
@@ -122,7 +123,7 @@ export async function PATCH(
       const { title, description, cover, isPublic } = body;
 
       const updated = await prisma.playlist.update({
-        where: { id: params.id },
+        where: { id: playlist.id },
         data: {
           title,
           description,
@@ -153,8 +154,8 @@ export async function DELETE(
 ) {
   return withAuth(request, async (req, session) => {
     try {
-      const playlist = await prisma.playlist.findUnique({
-        where: { id: params.id }
+      const playlist = await prisma.playlist.findFirst({
+        where: { OR: [{ id: params.id }, { slug: params.id }] }
       });
 
       if (!playlist) {
@@ -172,7 +173,7 @@ export async function DELETE(
       }
 
       await prisma.playlist.delete({
-        where: { id: params.id }
+        where: { id: playlist.id }
       });
 
       return NextResponse.json({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Music, Globe, User } from 'lucide-react';
 
@@ -15,15 +15,23 @@ export default function LiquidGlassNav() {
   const router = useRouter();
   const pathname = usePathname();
 
+  // Скрываем нижнее меню по событию (например, когда на карте открыта панель региона).
+  const [navHidden, setNavHidden] = useState(false);
+  useEffect(() => {
+    const onVis = (e: any) => setNavHidden(!!e?.detail?.hidden);
+    window.addEventListener('sonatum:nav-visibility', onVis);
+    return () => window.removeEventListener('sonatum:nav-visibility', onVis);
+  }, []);
+
   // Не показываем плавающую навигацию в админке — у неё свой sidebar.
   if (pathname?.startsWith('/admin') || pathname?.startsWith('/adminum')) {
     return null;
   }
 
   const navItems: NavItem[] = [
-    { id: 'music', icon: <Music size={22} />, label: 'Музыка', path: '/' },
-    { id: 'map', icon: <Globe size={22} />, label: 'Карта', path: '/map' },
-    { id: 'profile', icon: <User size={22} />, label: 'Профиль', path: '/profile' },
+    { id: 'music', icon: <Music size={20} />, label: 'Музыка', path: '/' },
+    { id: 'map', icon: <Globe size={20} />, label: 'Карта', path: '/map' },
+    { id: 'profile', icon: <User size={20} />, label: 'Профиль', path: '/profile' },
   ];
 
   // Активная вкладка с учётом подмаршрутов (профиль активен для /profile, /author/*, /edu/*)
@@ -87,14 +95,14 @@ export default function LiquidGlassNav() {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          gap: 4px;
+          gap: 3px;
           color: #86868b;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           cursor: pointer;
           border: none;
           background: transparent;
           -webkit-tap-highlight-color: transparent;
-          padding: 8px 0;
+          padding: 4px 0;
           width: 100%;
           height: 100%;
         }
@@ -117,8 +125,8 @@ export default function LiquidGlassNav() {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 22px;
-          height: 22px;
+          width: 20px;
+          height: 20px;
           flex-shrink: 0;
         }
 
@@ -128,7 +136,7 @@ export default function LiquidGlassNav() {
 
         /* Label */
         .nav-label {
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 500;
           letter-spacing: -0.02em;
           white-space: nowrap;
@@ -153,7 +161,7 @@ export default function LiquidGlassNav() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 4px;
+          gap: 2px;
         }
 
         /* Active Blob - Pure White */
@@ -177,7 +185,7 @@ export default function LiquidGlassNav() {
         }
       `}</style>
 
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[300] w-[calc(100%-48px)] max-w-[400px]">
+      <nav className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[300] w-[calc(100%-48px)] max-w-[400px] transition-all duration-300 ${navHidden ? 'translate-y-[200%] opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto' : ''}`}>
         <div className="relative">
           {/* Glass Container */}
           <div className="liquid-glass-nav relative rounded-full px-1 py-2 overflow-hidden">
@@ -207,7 +215,7 @@ export default function LiquidGlassNav() {
             />
 
             {/* Navigation Items */}
-            <div className="nav-items-container" style={{ height: '68px' }}>
+            <div className="nav-items-container" style={{ height: '52px' }}>
               {navItems.map((item, index) => (
                 <button
                   key={item.id}

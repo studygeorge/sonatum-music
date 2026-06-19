@@ -107,7 +107,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
                   href={author.socialLinks.youtube}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors flex items-center gap-1.5 text-xs font-medium"
+                  className="px-3 py-1.5 bg-[var(--text-primary)] text-white rounded-full hover:opacity-90 transition-colors flex items-center gap-1.5 text-xs font-medium"
                 >
                   <ExternalLink className="w-3 h-3" />
                   YouTube

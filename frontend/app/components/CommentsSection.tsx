@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/app/lib/api';
 import { PremiumModal } from "./PremiumModal";
 
+import { toast } from '@/app/components/Toast';
 interface CommentUser {
   id: string;
   username: string;
@@ -81,9 +82,10 @@ interface CommentItemProps {
   trackId: string;
   onReportOpen: (type: string, id: string) => void;
   onReplyPost: (content: string, parentId: string) => Promise<void>;
+  onDelete: (id: string) => void;
 }
 
-function CommentItem({ comment, depth, user, isPremium, trackId, onReportOpen, onReplyPost }: CommentItemProps) {
+function CommentItem({ comment, depth, user, isPremium, trackId, onReportOpen, onReplyPost, onDelete }: CommentItemProps) {
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(comment._count?.likes ?? comment.likesCount ?? 0);
   const [showReplyBox, setShowReplyBox] = useState(false);
@@ -92,6 +94,7 @@ function CommentItem({ comment, depth, user, isPremium, trackId, onReportOpen, o
   const [premiumOpen, setPremiumOpen] = useState(false);
   const [showReplies, setShowReplies] = useState(false);
   const [visibleCount, setVisibleCount] = useState(3);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const allReplies = depth === 0 ? getAllReplies(comment.replies || []).sort((a,b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) : [];
   const visibleReplies = allReplies.slice(0, visibleCount);
@@ -155,7 +158,7 @@ function CommentItem({ comment, depth, user, isPremium, trackId, onReportOpen, o
               className={`text-[11px] font-medium transition-colors ${isPremium ? 'text-[var(--text-secondary)] hover:text-[#1c1c1e]' : 'text-gray-300 cursor-default'}`}
               title={isPremium ? undefined : 'Только для Premium'}
             >
-              ↩ Ответить
+              <span className="inline-flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 14L4 9l5-5M4 9h11a5 5 0 015 5v3" /></svg>Ответить</span>
             </button>
           )}
 
@@ -164,8 +167,20 @@ function CommentItem({ comment, depth, user, isPremium, trackId, onReportOpen, o
             onClick={() => onReportOpen('COMMENT', comment.id)}
             className="text-[11px] text-[var(--text-secondary)] hover:text-red-400 transition-colors ml-auto"
           >
-            ⚑
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M4 21V4h11l-1.5 4L15 12H4" /></svg>
           </button>
+
+          {/* Delete (только свой комментарий) */}
+          {user?.id === comment.user.id && (
+            <button
+              onClick={() => setConfirmOpen(true)}
+              title="Удалить"
+              aria-label="Удалить комментарий"
+              className="text-[11px] text-[var(--text-secondary)] hover:text-red-500 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </button>
+          )}
         </div>
 
         {/* Reply input */}
@@ -209,6 +224,7 @@ function CommentItem({ comment, depth, user, isPremium, trackId, onReportOpen, o
                     trackId={trackId}
                     onReportOpen={onReportOpen}
                     onReplyPost={onReplyPost}
+                    onDelete={onDelete}
                   />
                 ))}
                 {visibleCount < allReplies.length && (
@@ -226,6 +242,31 @@ function CommentItem({ comment, depth, user, isPremium, trackId, onReportOpen, o
         )}
       </div>
     <PremiumModal open={premiumOpen} onClose={() => setPremiumOpen(false)} feature="Комментарии" />
+
+    {confirmOpen && (
+      <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md"
+           onClick={() => setConfirmOpen(false)}>
+        <div className="apple-card bg-white w-full max-w-xs p-5 shadow-2xl animate-fadeInUp text-center"
+             onClick={(e) => e.stopPropagation()}>
+          <h3 className="text-base font-bold text-[#1c1c1e] mb-1">Удалить комментарий?</h3>
+          <p className="text-[13px] text-[var(--text-secondary)] mb-4">Это действие нельзя отменить.</p>
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={() => setConfirmOpen(false)}
+              className="px-5 py-2 rounded-full bg-[var(--hover)] text-[#1c1c1e] text-[13px] font-semibold hover:bg-gray-200 transition-colors"
+            >
+              Отмена
+            </button>
+            <button
+              onClick={() => { setConfirmOpen(false); onDelete(comment.id); }}
+              className="px-5 py-2 rounded-full bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-colors"
+            >
+              Удалить
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }
@@ -301,11 +342,21 @@ export default function CommentsSection({ trackId, isPremium, user }: CommentsSe
     }
   };
 
+  const handleDelete = async (commentId: string) => {
+    const res = await api.deleteComment(commentId);
+    if (res.success) {
+      setPage(1);
+      fetchComments(sort, 1, false);
+    } else {
+      toast.error(res.error || 'Не удалось удалить комментарий');
+    }
+  };
+
   const submitReport = async () => {
     if (!reportModal) return;
     const res = await api.report(reportModal.id, reportModal.type, reportReason, reportDetails);
     if (res.success) {
-      alert('Жалоба отправлена. Спасибо!');
+      toast.error('Жалоба отправлена. Спасибо!');
       setReportModal(null);
       setReportDetails('');
     }
@@ -354,8 +405,8 @@ export default function CommentsSection({ trackId, isPremium, user }: CommentsSe
           </div>
         ) : (
           <button
-            onClick={() => setPremiumOpen(true)}
-            className="w-full text-left bg-gradient-to-br from-[#0039a6]/5 via-white to-[#d52b1e]/5 border border-[var(--border)] hover:border-[#1c1c1e] rounded-2xl p-5 mb-6 transition group"
+            onClick={() => { window.location.href = "/profile?tab=subscription"; }}
+            className="w-full text-left bg-gradient-to-br from-[#0039a6]/5 via-white to-[#2f9e8f]/5 border border-[var(--border)] hover:border-[#1c1c1e] rounded-2xl p-5 mb-6 transition group"
           >
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
@@ -383,7 +434,7 @@ export default function CommentsSection({ trackId, isPremium, user }: CommentsSe
         </div>
       ) : comments.length === 0 ? (
         <div className="text-center py-10 text-[var(--text-secondary)] text-[14px]">
-          Пока нет комментариев. Будьте первым! 💬
+          Пока нет комментариев. Будьте первым!
         </div>
       ) : (
         <div className="flex flex-col gap-6">
@@ -397,6 +448,7 @@ export default function CommentsSection({ trackId, isPremium, user }: CommentsSe
               trackId={trackId}
               onReportOpen={(type, id) => { setReportModal({ type, id }); setReportReason('INAPPROPRIATE'); setReportDetails(''); }}
               onReplyPost={handleReplyPost}
+              onDelete={handleDelete}
             />
           ))}
         </div>

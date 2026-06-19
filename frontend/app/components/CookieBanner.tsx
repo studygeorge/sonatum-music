@@ -37,7 +37,7 @@ export function CookieBanner() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-6 md:bottom-6 md:max-w-md z-[200]">
+    <div className="fixed bottom-28 left-4 right-4 md:left-auto md:right-6 md:bottom-6 md:max-w-md z-[350]">
       <div className="apple-card bg-white/95 backdrop-blur-md p-5 md:p-6 shadow-xl border border-[var(--border)]">
         <h3 className="font-semibold text-[var(--text-primary)] mb-2">Файлы cookie</h3>
         <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-4">

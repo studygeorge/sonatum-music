@@ -1,329 +1,198 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { authStorage } from '@/app/lib/auth';
 
-type FinData = {
-  period: string;
-  summary: {
-    usersTotal: number;
-    artistsTotal: number;
-    activeSubs: number;
-    tracksTotal: number;
-    tracksPublished: number;
-    revenueLicenses: number;
-    commissionLicenses: number;
-    payoutLicenses: number;
-    revenueSubscriptions: number;
-    revenueDonations: number;
-    licenseSales: number;
-    b2bPending: number;
-    exclusivePending: number;
-  };
-  byLicense: { code: string; name: string; shortName: string; commissionPct: number; sales: number; revenue: number; commission: number }[];
-  transactions: {
-    kind: string;
-    id: string;
-    amount: number;
-    commission: number;
-    status: string;
-    code: string;
-    detail: string;
-    buyer: string;
-    company: string | null;
-    subject: string;
-    createdAt: string;
-    paidAt: string | null;
-  }[];
+type Data = {
+  period: { from: string; to: string };
+  revenue: { total: number; licenses: number; subscriptions: number; donations: number };
+  platform: { total: number; licenses: number; subscriptions30pct: number; donations: number };
+  authorsAccrued: { total: number; licenses: number; subscriptionPool70pct: number; donations: number; manualB2b: number };
+  payouts: { executedGross: number; executedNet: number; taxHeld: number; count: number };
+  currentBalances: number;
+  counts: { licenses: number; subscriptions: number; donations: number; manualB2b: number };
+  monthly: { month: string; license: number; subscription: number; donation: number }[];
 };
 
-const fmtAmount = (n: number) => Math.round(n).toLocaleString('ru-RU');
-const fmtDate = (d: string | null) => {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' });
-};
+const fmt = (n: number) => n.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
 
-const STATUS_LABEL: Record<string, { l: string; c: string }> = {
-  PAID: { l: 'Оплачено', c: 'bg-black text-white' },
-  PENDING: { l: 'Ожидает', c: 'bg-gray-700 text-white' },
-  ACTIVE: { l: 'Активна', c: 'bg-black text-white' },
-  AWAITING_MANAGER: { l: 'У менеджера', c: 'bg-gray-200 text-gray-900 border border-gray-300' },
-  EXCLUSIVE_REQUESTED: { l: 'Эксклюзив', c: 'bg-gray-200 text-gray-900 border border-gray-300' },
-  REJECTED: { l: 'Отклонено', c: 'bg-white text-black border-2 border-black' },
-};
-
-const KIND_LABEL: Record<string, string> = {
-  LICENSE: 'Лицензия',
-  SUBSCRIPTION: 'Подписка',
-  DONATION: 'Донат',
-};
-
-export default function AdminFinancePage() {
-  const [data, setData] = useState<FinData | null>(null);
+export default function AdminFinanceDashboard() {
+  const [data, setData] = useState<Data | null>(null);
+  const [from, setFrom] = useState(() => new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
-  const [tab, setTab] = useState<'ALL' | 'LICENSE' | 'SUBSCRIPTION' | 'DONATION'>('ALL');
 
-  useEffect(() => {
+  const load = () => {
     setLoading(true);
-    fetch(`/api/admin/finance?period=${period}`, {
+    fetch(`/api/admin/finance/dashboard?from=${from}&to=${to}`, {
       headers: { Authorization: `Bearer ${authStorage.getToken() || ''}` },
     })
       .then((r) => r.json())
-      .then((j) => {
-        if (j.success) setData(j.data);
-      })
+      .then((j) => { if (j.success) setData(j.data); })
       .finally(() => setLoading(false));
-  }, [period]);
+  };
+  useEffect(() => { load(); }, [from, to]);
 
-  if (loading) return <div className="min-h-screen pt-20 text-center text-[var(--text-secondary)]">Загрузка…</div>;
-  if (!data) return <div className="min-h-screen pt-20 text-center text-[var(--text-secondary)]">Нет доступа</div>;
+  if (loading || !data) {
+    return <div className="apple-card p-10 text-center text-[var(--text-secondary)]">Загрузка…</div>;
+  }
 
-  const s = data.summary;
-  const totalRevenue = s.revenueLicenses + s.revenueSubscriptions + s.revenueDonations;
-  const totalCommission = s.commissionLicenses + s.revenueSubscriptions * 0.3; // 30% от подписок
-
-  const txs = tab === 'ALL' ? data.transactions : data.transactions.filter((t) => t.kind === tab);
+  const maxMonth = Math.max(1, ...data.monthly.map(m => m.license + m.subscription + m.donation));
 
   return (
-    <main className="min-h-screen pt-6 md:pt-10 pb-20 px-4 md:px-8 max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6">
       <section
-        className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white flex items-end justify-between gap-4 flex-wrap"
-        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)' }}>
-        <div className="relative z-10 max-w-2xl">
-          <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-90">
-            Админ · Финансы
-          </div>
-          <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white">
-            Финансы платформы
-          </h1>
-          <p className="text-sm md:text-base text-white/85 mt-2">
-            Все операции, комиссия, начисления авторам, B2B-запросы.
+        className="relative rounded-3xl overflow-hidden p-7 md:p-10 flex items-end justify-between gap-4 flex-wrap"
+        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #2f9e8f 55%, #e6e6e6 100%)' }}>
+        <div className="relative z-10 max-w-xl">
+          <div className="text-xs uppercase tracking-widest font-semibold mb-2 text-white/90">Финансы платформы</div>
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white">Дашборд</h1>
+          <p className="text-sm md:text-base text-white/90 mt-2 max-w-lg">
+            Выручка, доход платформы, начисления авторам и выплаты — за выбранный период.
           </p>
         </div>
-        <div className="flex gap-1 bg-white/10 backdrop-blur-md rounded-full p-1 shrink-0">
-          {[
-            { v: '7d', l: '7 дней' },
-            { v: '30d', l: '30 дней' },
-            { v: '90d', l: '90 дней' },
-            { v: 'all', l: 'Всё время' },
-          ].map((p) => (
-            <button
-              key={p.v}
-              onClick={() => setPeriod(p.v as any)}
-              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                period === p.v ? 'bg-white text-[var(--text-primary)]' : 'text-white/80 hover:text-white'
-              }`}>
-              {p.l}
-            </button>
-          ))}
+        <div className="flex gap-2 flex-wrap relative z-10">
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+            className="px-3 py-2 rounded-full bg-white text-[#1c1c1e] text-sm" />
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
+            className="px-3 py-2 rounded-full bg-white text-[#1c1c1e] text-sm" />
         </div>
       </section>
-      {/* Сводка */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="Общий оборот" value={`${fmtAmount(totalRevenue)} ₽`} accent />
-        <Stat label="Комиссия платформы" value={`${fmtAmount(totalCommission)} ₽`} />
-        <Stat label="Начислено авторам" value={`${fmtAmount(s.payoutLicenses + s.revenueDonations)} ₽`} />
-        <Stat label="Активные подписки" value={s.activeSubs} sub={`из ${s.usersTotal} пользователей`} />
-      </div>
-      {/* Источники дохода */}
-      <section className="apple-card p-5 md:p-6">
-        <h2 className="text-lg font-bold tracking-tight mb-4">Источники дохода за период</h2>
-        <div className="grid sm:grid-cols-3 gap-3">
-          <RevenueCard
-            label="Продажи лицензий"
-            amount={s.revenueLicenses}
-            count={s.licenseSales}
-            commission={s.commissionLicenses}
-            commissionLabel="комиссия (10-20%)"
-          />
-          <RevenueCard
-            label="Premium-подписки"
-            amount={s.revenueSubscriptions}
-            count={s.activeSubs}
-            commission={s.revenueSubscriptions * 0.3}
-            commissionLabel="комиссия 30% (пул автору 70%)"
-          />
-          <RevenueCard
-            label="Донаты"
-            amount={s.revenueDonations}
-            count={0}
-            commission={0}
-            commissionLabel="комиссия 0% (100% автору)"
-          />
-        </div>
-      </section>
-      {/* Ожидающие действий */}
-      {(s.b2bPending> 0 || s.exclusivePending> 0) && (
-        <section className="apple-card p-5 md:p-6 bg-gray-50 border border-gray-300">
-          <h2 className="text-base font-bold mb-3">Ожидают действий менеджера</h2>
-          <div className="flex gap-3 flex-wrap">
-            {s.b2bPending> 0 && (
-              <div className="rounded-2xl border border-[var(--border)] bg-white p-3 px-4 bg-white">
-                <span className="font-bold text-lg tabular-nums">{s.b2bPending}</span>
-                <span className="text-sm text-[var(--text-secondary)] ml-2">B2B-запросов</span>
-              </div>
-            )}
-            {s.exclusivePending> 0 && (
-              <div className="rounded-2xl border border-[var(--border)] bg-white p-3 px-4 bg-white">
-                <span className="font-bold text-lg tabular-nums">{s.exclusivePending}</span>
-                <span className="text-sm text-[var(--text-secondary)] ml-2">эксклюзивных запросов</span>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
 
-      {/* По типам лицензий */}
-      <section className="apple-card p-5 md:p-6 overflow-x-auto">
-        <h2 className="text-lg font-bold tracking-tight mb-4">Продажи по типам лицензий</h2>
-        <table className="w-full text-sm min-w-[640px]">
-          <thead>
-            <tr className="text-left text-[var(--text-secondary)] text-xs border-b border-[var(--border)]">
-              <th className="pb-2 font-medium">Тип</th>
-              <th className="pb-2 font-medium text-right">Комиссия</th>
-              <th className="pb-2 font-medium text-right">Продаж</th>
-              <th className="pb-2 font-medium text-right">Оборот</th>
-              <th className="pb-2 font-medium text-right">Комиссия платформы</th>
+      {/* Главные показатели */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard label="Выручка от пользователей" value={`${fmt(data.revenue.total)} ₽`} sub="лицензии + подписки + донаты" />
+        <StatCard label="Доход платформы" value={`${fmt(data.platform.total)} ₽`} sub={`${pct(data.platform.total, data.revenue.total)}% от выручки`} />
+        <StatCard label="Начислено авторам" value={`${fmt(data.authorsAccrued.total)} ₽`} sub="брутто (до налога)" />
+        <StatCard label="Балансы авторов" value={`${fmt(data.currentBalances)} ₽`} sub="доступно к выплате" />
+      </div>
+
+      {/* Детализация */}
+      <div className="grid md:grid-cols-3 gap-4">
+        <DetailCard
+          title="Выручка"
+          rows={[
+            ['Лицензии', `${fmt(data.revenue.licenses)} ₽`, data.counts.licenses + ' шт'],
+            ['Подписки Premium', `${fmt(data.revenue.subscriptions)} ₽`, data.counts.subscriptions + ' шт'],
+            ['Донаты', `${fmt(data.revenue.donations)} ₽`, data.counts.donations + ' шт'],
+          ]}
+          total={`${fmt(data.revenue.total)} ₽`}
+        />
+        <DetailCard
+          title="Доход платформы"
+          rows={[
+            ['Комиссии лицензий', `${fmt(data.platform.licenses)} ₽`, '10–20%'],
+            ['30% от подписок', `${fmt(data.platform.subscriptions30pct)} ₽`, ''],
+            ['10% от донатов', `${fmt(data.platform.donations)} ₽`, ''],
+          ]}
+          total={`${fmt(data.platform.total)} ₽`}
+        />
+        <DetailCard
+          title="Начислено авторам"
+          rows={[
+            ['Лицензии (80–90%)', `${fmt(data.authorsAccrued.licenses)} ₽`, ''],
+            ['Пул подписок (70%)', `${fmt(data.authorsAccrued.subscriptionPool70pct)} ₽`, ''],
+            ['Донаты (90%)', `${fmt(data.authorsAccrued.donations)} ₽`, ''],
+            ['B2B вручную', `${fmt(data.authorsAccrued.manualB2b)} ₽`, data.counts.manualB2b + ' шт'],
+          ]}
+          total={`${fmt(data.authorsAccrued.total)} ₽`}
+        />
+      </div>
+
+      {/* Выплаты */}
+      <div className="apple-card p-6">
+        <h2 className="text-lg font-bold mb-4">Выплаты за период</h2>
+        <div className="grid sm:grid-cols-4 gap-3">
+          <SmallStat label="Кол-во" value={data.payouts.count} />
+          <SmallStat label="Брутто" value={`${fmt(data.payouts.executedGross)} ₽`} />
+          <SmallStat label="НПД 6% (удержано)" value={`${fmt(data.payouts.taxHeld)} ₽`} />
+          <SmallStat label="На карты (нетто)" value={`${fmt(data.payouts.executedNet)} ₽`} />
+        </div>
+      </div>
+
+      {/* Помесячный график */}
+      <div className="apple-card p-6">
+        <h2 className="text-lg font-bold mb-4">Выручка по месяцам (12 мес)</h2>
+        <div className="space-y-2">
+          {data.monthly.map((m) => {
+            const total = m.license + m.subscription + m.donation;
+            const w = (total / maxMonth) * 100;
+            return (
+              <div key={m.month} className="flex items-center gap-3">
+                <div className="text-xs text-[var(--text-secondary)] w-16 tabular-nums">{m.month}</div>
+                <div className="flex-1 h-6 bg-[var(--hover)] rounded-md overflow-hidden flex">
+                  {total > 0 && (
+                    <>
+                      <div style={{ width: `${(m.license / total) * w}%`, background: '#1c1c1e' }} title={`Лицензии: ${fmt(m.license)}`} />
+                      <div style={{ width: `${(m.subscription / total) * w}%`, background: '#1d4cb8' }} title={`Подписки: ${fmt(m.subscription)}`} />
+                      <div style={{ width: `${(m.donation / total) * w}%`, background: '#2f9e8f' }} title={`Донаты: ${fmt(m.donation)}`} />
+                    </>
+                  )}
+                </div>
+                <div className="text-xs tabular-nums font-medium w-24 text-right">{fmt(total)} ₽</div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex gap-4 mt-4 text-xs">
+          <Legend color="#1c1c1e" label="Лицензии" />
+          <Legend color="#1d4cb8" label="Подписки" />
+          <Legend color="#2f9e8f" label="Донаты" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div className="apple-card p-5">
+      <div className="text-[11px] uppercase tracking-widest font-bold text-[var(--text-secondary)]">{label}</div>
+      <div className="text-2xl font-black mt-2 tabular-nums">{value}</div>
+      <div className="text-[11px] text-[var(--text-secondary)] mt-1">{sub}</div>
+    </div>
+  );
+}
+function SmallStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-widest font-bold text-[var(--text-secondary)]">{label}</div>
+      <div className="text-xl font-black mt-1 tabular-nums">{value}</div>
+    </div>
+  );
+}
+function DetailCard({ title, rows, total }: { title: string; rows: [string, string, string][]; total: string }) {
+  return (
+    <div className="apple-card p-5">
+      <h3 className="font-bold mb-3">{title}</h3>
+      <table className="w-full text-sm">
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="border-b border-[var(--border)] last:border-0">
+              <td className="py-2 text-[var(--text-secondary)]">{r[0]}</td>
+              <td className="py-2 text-right tabular-nums">{r[1]}</td>
+              <td className="py-2 text-right text-xs text-[var(--text-secondary)] w-16">{r[2]}</td>
             </tr>
-          </thead>
-          <tbody>
-            {data.byLicense.map((l) => (
-              <tr key={l.code} className="border-b border-[var(--border)] last:border-0">
-                <td className="py-2.5">
-                  <div className="font-medium">{l.shortName}</div>
-                </td>
-                <td className="py-2.5 text-right text-[var(--text-secondary)] tabular-nums">{l.commissionPct}%</td>
-                <td className="py-2.5 text-right tabular-nums">{l.sales}</td>
-                <td className="py-2.5 text-right tabular-nums font-medium">{fmtAmount(l.revenue)} ₽</td>
-                <td className="py-2.5 text-right tabular-nums text-gray-900">+{fmtAmount(l.commission)} ₽</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-      {/* Транзакции */}
-      <section className="apple-card p-5 md:p-6">
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-          <h2 className="text-lg font-bold tracking-tight">Все операции</h2>
-          <div className="flex gap-1 bg-[var(--hover)] rounded-full p-1">
-            {[
-              { v: 'ALL', l: 'Все' },
-              { v: 'LICENSE', l: 'Лицензии' },
-              { v: 'SUBSCRIPTION', l: 'Подписки' },
-              { v: 'DONATION', l: 'Донаты' },
-            ].map((t) => (
-              <button
-                key={t.v}
-                onClick={() => setTab(t.v as any)}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                  tab === t.v ? 'bg-[var(--text-primary)] text-white' : 'text-[var(--text-primary)]'
-                }`}>
-                {t.l}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[700px]">
-            <thead>
-              <tr className="text-left text-[var(--text-secondary)] text-xs border-b border-[var(--border)]">
-                <th className="pb-2 font-medium">Тип</th>
-                <th className="pb-2 font-medium">Объект</th>
-                <th className="pb-2 font-medium">Покупатель</th>
-                <th className="pb-2 font-medium">Статус</th>
-                <th className="pb-2 font-medium text-right">Сумма</th>
-                <th className="pb-2 font-medium text-right">Комиссия</th>
-                <th className="pb-2 font-medium text-right">Дата</th>
-              </tr>
-            </thead>
-            <tbody>
-              {txs.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-6 text-center text-[var(--text-secondary)]">
-                    Нет операций
-                  </td>
-                </tr>
-              ) : (
-                txs.map((t) => {
-                  const st = STATUS_LABEL[t.status] || { l: t.status, c: 'bg-gray-100 text-gray-700' };
-                  return (
-                    <tr key={t.id} className="border-b border-[var(--border)] last:border-0">
-                      <td className="py-2.5 text-xs">
-                        <span className="px-2 py-0.5 rounded-full bg-[var(--hover)]">
-                          {KIND_LABEL[t.kind] || t.kind}
-                        </span>
-                      </td>
-                      <td className="py-2.5">
-                        <div className="font-medium truncate max-w-[200px]">{t.subject}</div>
-                        <div className="text-xs text-[var(--text-secondary)]">{t.detail}</div>
-                      </td>
-                      <td className="py-2.5">
-                        <div className="text-xs truncate max-w-[180px]">{t.buyer}</div>
-                        {t.company && <div className="text-[10px] text-[var(--text-secondary)] truncate">{t.company}</div>}
-                      </td>
-                      <td className="py-2.5">
-                        <span className={`text-[11px] px-2 py-0.5 rounded-full ${st.c} whitespace-nowrap`}>{st.l}</span>
-                      </td>
-                      <td className="py-2.5 text-right font-medium tabular-nums">{fmtAmount(t.amount)} ₽</td>
-                      <td className="py-2.5 text-right text-gray-900 tabular-nums">
-                        {t.commission> 0 ? `+${fmtAmount(t.commission)} ₽` : '—'}
-                      </td>
-                      <td className="py-2.5 text-right text-xs text-[var(--text-secondary)] whitespace-nowrap">
-                        {fmtDate(t.paidAt || t.createdAt)}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-      <div className="text-center pt-4">
-        <Link href="/admin" className="text-sm text-[var(--accent)] hover:underline">
-          Назад в админ-панель
-        </Link>
-      </div>
-    </main>
-  );
-}
-
-function Stat({ label, value, sub, accent }: { label: string; value: any; sub?: string; accent?: boolean }) {
-  return (
-    <div className={`apple-card p-5 ${accent ? 'bg-[var(--text-primary)] text-white' : ''}`}>
-      <div className={`text-xs mb-1.5 ${accent ? 'text-white/70' : 'text-[var(--text-secondary)]'}`}>{label}</div>
-      <div className="text-xl md:text-2xl font-black tabular-nums tracking-tight">{value}</div>
-      {sub && (
-        <div className={`text-[11px] mt-1 ${accent ? 'text-white/70' : 'text-[var(--text-secondary)]'}`}>{sub}</div>
-      )}
+          ))}
+          <tr className="border-t-2 border-[var(--text-primary)]">
+            <td className="pt-2 font-bold">Итого</td>
+            <td className="pt-2 text-right font-bold tabular-nums">{total}</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }
-
-function RevenueCard({
-  label,
-  amount,
-  count,
-  commission,
-  commissionLabel,
-}: {
-  label: string;
-  amount: number;
-  count: number;
-  commission: number;
-  commissionLabel: string;
-}) {
+function Legend({ color, label }: { color: string; label: string }) {
   return (
-    <div className="apple-card p-4">
-      <div className="text-xs text-[var(--text-secondary)] mb-1">{label}</div>
-      <div className="text-xl font-black tabular-nums tracking-tight mb-1">{fmtAmount(amount)} ₽</div>
-      {count> 0 && (
-        <div className="text-[11px] text-[var(--text-secondary)] mb-2">{count} операций</div>
-      )}
-      <div className="text-xs text-gray-900 tabular-nums">+{fmtAmount(commission)} ₽</div>
-      <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">{commissionLabel}</div>
+    <div className="flex items-center gap-1.5">
+      <div style={{ background: color }} className="w-3 h-3 rounded-sm" />
+      <span className="text-[var(--text-secondary)]">{label}</span>
     </div>
   );
+}
+function pct(part: number, whole: number): number {
+  if (!whole) return 0;
+  return Math.round((part / whole) * 100);
 }

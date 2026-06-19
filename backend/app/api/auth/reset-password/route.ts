@@ -15,11 +15,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({} as Record<string, unknown>));
     const token = typeof body.token === "string" ? body.token.trim() : "";
+    const code = typeof body.code === "string" ? body.code.trim() : "";
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const password = typeof body.password === "string" ? body.password : "";
 
-    if (!token || token.length < 16) {
+    if (!token && !(code && email)) {
       return NextResponse.json(
-        { success: false, error: "Некорректный токен" },
+        { success: false, error: "Нужен токен или код+email" },
         { status: 400, headers: corsHeaders }
       );
     }
@@ -30,9 +32,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const record = await prisma.verificationToken.findUnique({
-      where: { token },
-    });
+    let record: any = null;
+    if (token) {
+      record = await prisma.verificationToken.findUnique({ where: { token } });
+    } else {
+      const user = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+      if (user) {
+        const [r] = (await prisma.$queryRawUnsafe(
+          `SELECT id, token, "userId", purpose, "expiresAt", "usedAt"
+             FROM verification_tokens
+            WHERE "userId" = $1 AND code = $2 AND purpose = 'PASSWORD_RESET'
+            ORDER BY "createdAt" DESC LIMIT 1`,
+          user.id, code
+        )) as any[];
+        record = r;
+      }
+    }
     if (!record || record.purpose !== "PASSWORD_RESET") {
       return NextResponse.json(
         { success: false, error: "Ссылка недействительна" },

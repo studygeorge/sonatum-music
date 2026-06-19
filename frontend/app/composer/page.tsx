@@ -138,7 +138,7 @@ export default function ComposerPage() {
               <div key={work.id} className="apple-card p-6">
                 <div className="flex items-center gap-6">
                   <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-3xl flex-shrink-0">
-                    ♪
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="font-semibold text-gray-900 mb-1">{work.title}</h4>
@@ -147,7 +147,7 @@ export default function ComposerPage() {
                       <span>•</span>
                       <span>{work.genre}</span>
                       <span>•</span>
-                      <span>💿 {work.sales} продаж</span>
+                      <span>{work.sales} продаж</span>
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">

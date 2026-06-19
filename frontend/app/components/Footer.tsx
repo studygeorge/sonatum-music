@@ -20,7 +20,7 @@ export default function Footer() {
             <img src="/logo.png" alt="Сонатум" width="180" height="48" className="h-10 w-auto" />
           </Link>
           <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-6 max-w-md">
-            Музыкальный сервис, объединяющий духовное и народное наследие в совершенном цифровом формате.
+            Музыкальный сервис, объединяющий историческое наследие и современное творчество в совершенном цифровом формате.
           </p>
           <h4 className="font-semibold text-[var(--text-primary)] mb-3 uppercase text-xs tracking-wider">Контакты</h4>
           <ul className="space-y-2 text-sm text-[var(--text-secondary)]">
@@ -70,16 +70,46 @@ export default function Footer() {
              <li><Link href="/legal/personal-data" className="hover:text-[var(--text-primary)] transition-colors">Обработка персональных данных</Link></li>
              <li><Link href="/legal/refund" className="hover:text-[var(--text-primary)] transition-colors">Условия возврата</Link></li>
              <li><Link href="/legal/cookies" className="hover:text-[var(--text-primary)] transition-colors">Использование файлов Cookie</Link></li>
+             <li><Link href="/legal/recommendations" className="hover:text-[var(--text-primary)] transition-colors">Рекомендательные технологии</Link></li>
            </ul>
         </div>
       </div>
 
+      {/* Поддержка Фонда содействия инновациям */}
+      <div className="max-w-7xl mx-auto px-6 md:px-12 mb-12">
+        <div className="flex flex-col md:flex-row items-center gap-5 md:gap-7 border-t border-[var(--border)] pt-8">
+          <div className="flex items-center gap-5 md:gap-7 shrink-0">
+            <img
+              src="/partners/fasie.png"
+              alt="Фонд содействия инновациям"
+              width="200"
+              height="100"
+              className="h-16 md:h-20 w-auto select-none"
+            />
+            <img
+              src="/partners/platforma.svg"
+              alt="Платформа университетского технологического предпринимательства"
+              width="200"
+              height="120"
+              className="h-16 md:h-20 w-auto select-none"
+            />
+          </div>
+          <p className="text-xs leading-relaxed text-[var(--text-secondary)] max-w-3xl text-center md:text-left">
+            Проект реализован при поддержке Фонда содействия инновациям в рамках программы «Студенческий стартап»
+            мероприятия «Платформа университетского технологического предпринимательства» федерального проекта «Технологии».
+          </p>
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col md:flex-row justify-between items-center text-xs text-[var(--text-secondary)] border-t border-[var(--border)] pt-8">
-        <p>© 2026 Sonatum Music. Все права защищены.</p>
+        <p className="flex items-center gap-2">
+          <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded border border-[var(--border)] text-[10px] font-semibold text-[var(--text-secondary)]">12+</span>
+          © 2026 Sonatum Music. Все права защищены.
+        </p>
         <div className="flex gap-6 mt-4 md:mt-0">
-          <span className="cursor-pointer hover:text-[var(--text-primary)] transition-colors">VK</span>
-          <span className="cursor-pointer hover:text-[var(--text-primary)] transition-colors">Telegram</span>
-          <span className="cursor-pointer hover:text-[var(--text-primary)] transition-colors">YouTube</span>
+          <a href="https://vk.com/sonatum" target="_blank" rel="noopener noreferrer" className="cursor-pointer hover:text-[var(--text-primary)] transition-colors">ВКонтакте</a>
+          <a href="https://max.ru/id2634116369_biz" target="_blank" rel="noopener noreferrer" className="cursor-pointer hover:text-[var(--text-primary)] transition-colors">МАКС</a>
+          <a href="https://rutube.ru/channel/78183980/" target="_blank" rel="noopener noreferrer" className="cursor-pointer hover:text-[var(--text-primary)] transition-colors">Rutube</a>
         </div>
       </div>
     </footer>

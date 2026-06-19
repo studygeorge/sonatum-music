@@ -30,6 +30,7 @@ const NAV = [
   { href: '/author/upload', label: 'Загрузить' },
   { href: '/author/analytics', label: 'Аналитика' },
   { href: '/author/finance', label: 'Финансы' },
+  { href: '/author/payout', label: 'Выплаты' },
   { href: '/author/collabs', label: 'Коллаборации' },
   { href: '/author/events', label: 'События' },
   { href: '/author/settings', label: 'Настройки' },

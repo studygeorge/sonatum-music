@@ -2,6 +2,7 @@
 
 import { authStorage } from '@/app/lib/auth';
 
+import { toast } from '@/app/components/Toast';
 export default function PremiumPromo() {
   return (
     <section className="relative">
@@ -52,10 +53,10 @@ export default function PremiumPromo() {
                     if (j?.success && j?.paymentUrl) {
                       window.location.href = j.paymentUrl;
                     } else {
-                      alert(j?.error || 'Не удалось перейти к оплате');
+                      toast.error(j?.error || 'Не удалось перейти к оплате');
                     }
                   } catch {
-                    alert('Ошибка сети');
+                    toast.error('Ошибка сети');
                   }
                 }}
                 className="bg-white text-[#1d4cb8] px-7 py-3.5 rounded-full font-bold text-[15px] hover:bg-white/90 transition-all shadow-lg"

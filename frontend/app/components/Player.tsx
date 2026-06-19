@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '../lib/api';
 import { usePathname } from 'next/navigation';
+import AddToPlaylistButton from './AddToPlaylistButton';
 
 export default function Player() {
   const pname = usePathname();
@@ -21,6 +22,7 @@ export default function Player() {
     seek,
     setVolume,
     skipNext,
+    shuffleMode,
     skipPrevious,
     toggleShuffle,
   } = usePlayer();
@@ -194,10 +196,14 @@ export default function Player() {
                 {/* Row 1: title + artist, centered, no cover */}
                 <div className="flex flex-col items-center text-center min-w-0 px-4">
                   <p className="font-semibold text-[var(--text-primary)] truncate w-full text-[12.5px] leading-snug">
-                    {track.title}
+                    {track.id
+                      ? <Link href={`/tracks/${track.slug || track.id}`} className="active:opacity-60">{track.title}</Link>
+                      : track.title}
                   </p>
                   <p className="text-[var(--text-secondary)] truncate w-full text-[10.5px] leading-tight">
-                    {track.artist?.name || 'Sonatum'}
+                    {track.artist?.id
+                      ? <Link href={`/artist/${track.artist?.slug || track.artist?.id}`} className="active:opacity-60">{track.artist?.name || 'Sonatum'}</Link>
+                      : (track.artist?.name || 'Sonatum')}
                   </p>
                 </div>
 
@@ -245,13 +251,14 @@ export default function Player() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
                     </svg>
                   </button>
+                  <AddToPlaylistButton className="w-5 h-5 p-1.5 box-content flex-shrink-0" />
                 </div>
 
               </div>
 
               {/* ═══════════════════════════════════════════
                   DESKTOP — 3 balanced flex-1 columns
-                  [cover+title] | [⏮ ▶ ⏭ + bar] | [shuffle + ✚ | vol]
+                  [cover+title] | [prev play next + bar] | [shuffle + add | vol]
                   Hidden on mobile
               ═══════════════════════════════════════════ */}
               <div className="hidden md:flex md:flex-row md:items-center gap-4">
@@ -261,7 +268,7 @@ export default function Player() {
                   <div className="w-11 h-11 rounded-[0.75rem] bg-[var(--text-primary)] flex-shrink-0 text-white overflow-hidden shadow-sm opacity-90">
                     {track.cover
                       ? <img src={track.cover} alt="Cover" className="w-full h-full object-cover" />
-                      : <div className="w-full h-full flex items-center justify-center text-lg">🎵</div>
+                      : <div className="w-full h-full flex items-center justify-center"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg></div>
                     }
                   </div>
                   <div className="min-w-0 flex-1">
@@ -331,7 +338,7 @@ export default function Player() {
                 <div className="hidden lg:flex items-center justify-end gap-2.5 flex-1">
                   {/* Shuffle */}
                   <button onClick={toggleShuffle} title="Случайное воспроизведение"
-                    className={`text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors p-1 ${!currentTrack && 'opacity-50 cursor-not-allowed'}`}>
+                    className={`transition-colors p-1 ${shuffleMode ? 'text-[#1d4cb8]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'} ${!currentTrack && 'opacity-50 cursor-not-allowed'}`}>
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
                     </svg>
@@ -343,6 +350,8 @@ export default function Player() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
                     </svg>
                   </button>
+                  {/* Add to playlist */}
+                  <AddToPlaylistButton className="w-4 h-4 p-1 box-content" />
                   {/* Thin divider */}
                   <div className="w-px h-4 bg-[var(--border)] opacity-40 flex-shrink-0" />
                   {/* Volume icon */}

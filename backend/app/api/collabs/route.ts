@@ -79,6 +79,16 @@ export async function GET(request: NextRequest) {
     conds.push(`cr.genre ILIKE $${args.length}`);
   }
 
+  // Скрываем заявки заблокированных пользователей (в обе стороны)
+  if (userId && !mine) {
+    args.push(userId);
+    args.push(userId);
+    conds.push(`cr.author_id NOT IN (
+      SELECT blocked_id FROM user_blocks WHERE blocker_id = $${args.length - 1}
+      UNION SELECT blocker_id FROM user_blocks WHERE blocked_id = $${args.length}
+    )`);
+  }
+
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
   const rows = (await prisma.$queryRawUnsafe(
     `SELECT cr.*, COALESCE(a.name, c.name, u.username, u.email) AS author_name,

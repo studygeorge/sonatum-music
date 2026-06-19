@@ -7,6 +7,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { api } from '@/app/lib/api';
 
+import { toast } from '@/app/components/Toast';
 // Setup pdf.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -42,7 +43,9 @@ export default function SheetMusicViewer({ sheetId, pdfUrl, title, onClose }: Pr
   const [pageWidth, setPageWidth] = useState<number>(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
-  
+  const [draftShared, setDraftShared] = useState(false);
+  const [eduContext, setEduContext] = useState<{ role: string } | null>(null);
+
   const pageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,6 +82,7 @@ export default function SheetMusicViewer({ sheetId, pdfUrl, title, onClose }: Pr
   const fetchAnnotations = async () => {
     const res = await api.getSheetAnnotations(sheetId);
     if (res.success && res.data) {
+      setEduContext((res as any).eduContext || null);
       setAnnotations(res.data);
     }
   };
@@ -116,13 +120,15 @@ export default function SheetMusicViewer({ sheetId, pdfUrl, title, onClose }: Pr
       positionX: draftPos.x,
       positionY: draftPos.y,
       content: draftContent,
-      color: '#fbbf24'
+      color: '#fbbf24',
+      isShared: draftShared,
     });
     if (res.success) {
       setIsDrafting(false);
+      setDraftShared(false);
       fetchAnnotations();
     } else {
-      alert(res.error || 'Ошибка сохранения заметки');
+      toast.error(res.error || 'Ошибка сохранения заметки');
     }
   };
 
@@ -133,7 +139,7 @@ export default function SheetMusicViewer({ sheetId, pdfUrl, title, onClose }: Pr
       setActiveNoteId(null);
       setNoteToDelete(null);
     } else {
-      alert(res.error || 'Ошибка удаления заметки');
+      toast.error(res.error || 'Ошибка удаления заметки');
     }
   };
 
@@ -234,10 +240,10 @@ export default function SheetMusicViewer({ sheetId, pdfUrl, title, onClose }: Pr
                 <div 
                   key={note.id}
                   className="note-marker absolute w-6 h-6 -ml-3 -mt-3 rounded-full shadow-md cursor-pointer transition-transform hover:scale-125 hover:z-50 border-2 border-white flex items-center justify-center"
-                  style={{ 
-                    left: `${note.positionX}%`, 
-                    top: `${note.positionY}%`, 
-                    backgroundColor: '#fbbf24',
+                  style={{
+                    left: `${note.positionX}%`,
+                    top: `${note.positionY}%`,
+                    backgroundColor: (note as any).isShared ? '#3b82f6' : '#fbbf24',
                     zIndex: activeNoteId === note.id ? 50 : 10
                   }}
                   onClick={(e) => {
@@ -255,7 +261,12 @@ export default function SheetMusicViewer({ sheetId, pdfUrl, title, onClose }: Pr
                         <div className="w-5 h-5 rounded-full bg-gray-200 overflow-hidden shrink-0">
                           {note.user?.avatar && <img src={note.user.avatar} alt="avatar" className="w-full h-full object-cover" />}
                         </div>
-                        <span className="text-[11px] font-bold text-[#1c1c1e] truncate flex-1">{note.user?.firstName || note.user?.username || 'Пользователь'}</span>
+                        <span className="text-[11px] font-bold text-[#1c1c1e] truncate flex-1">
+                          {note.user?.firstName || note.user?.username || 'Пользователь'}
+                          {(note as any).isShared && (
+                            <span className="ml-1 text-[8px] px-1 py-0.5 rounded bg-blue-100 text-blue-700 font-medium align-middle">общая</span>
+                          )}
+                        </span>
                         {currentUserId && note.user?.id === currentUserId && (
                           <button 
                             onClick={() => setNoteToDelete(note.id)}
@@ -308,8 +319,19 @@ export default function SheetMusicViewer({ sheetId, pdfUrl, title, onClose }: Pr
                         }
                       }}
                     />
+                    {eduContext && (eduContext.role === 'ADMIN' || eduContext.role === 'TEACHER') && (
+                      <label className="flex items-center gap-1.5 mb-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={draftShared}
+                          onChange={(e) => setDraftShared(e.target.checked)}
+                          className="w-3.5 h-3.5"
+                        />
+                        <span className="text-[10px] text-gray-600">Видна учащимся учреждения</span>
+                      </label>
+                    )}
                     <div className="flex gap-2">
-                      <button onClick={() => setIsDrafting(false)} className="flex-1 py-1.5 rounded-md text-[11px] font-bold text-gray-500 hover:bg-gray-100 transition-colors">Отмена</button>
+                      <button onClick={() => { setIsDrafting(false); setDraftShared(false); }} className="flex-1 py-1.5 rounded-md text-[11px] font-bold text-gray-500 hover:bg-gray-100 transition-colors">Отмена</button>
                       <button onClick={saveAnnotation} className="flex-1 py-1.5 rounded-md text-[11px] font-bold bg-[#3b82f6] text-white hover:bg-blue-600 transition-colors">Сохранить</button>
                     </div>
                   </div>

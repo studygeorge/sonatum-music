@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { authStorage } from '@/app/lib/auth';
 
+import { toast } from '@/app/components/Toast';
 export default function EventDetailPage({ params }: { params: { id: string } }) {
   const [ev, setEv] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -48,7 +49,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
       navigator.share({ title: ev?.title, url });
     } else {
       navigator.clipboard.writeText(url);
-      alert('Ссылка скопирована');
+      toast.error('Ссылка скопирована');
     }
   };
 
@@ -96,7 +97,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
         ) : (
           <div
             className="aspect-[16/9] md:aspect-[21/9] flex items-center justify-center text-7xl text-white"
-            style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)' }}>
+            style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #2f9e8f 55%, #e6e6e6 100%)' }}>
           </div>
         )}
 

@@ -51,7 +51,7 @@ export default function MarketplacePage() {
               <div className="flex items-center gap-6">
                 {/* Обложка */}
                 <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-3xl flex-shrink-0">
-                  ♪
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
                 </div>
 
                 {/* Информация */}
@@ -59,8 +59,8 @@ export default function MarketplacePage() {
                   <h3 className="font-semibold text-gray-900 mb-1">{track.title}</h3>
                   <p className="text-sm text-gray-600">{track.artist}</p>
                   <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                    <span>★ {track.rating}</span>
-                    <span>💿 {track.sales} продаж</span>
+                    <span>{track.rating}</span>
+                    <span>{track.sales} продаж</span>
                   </div>
                 </div>
 

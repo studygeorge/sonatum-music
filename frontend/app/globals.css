@@ -264,3 +264,37 @@ a, button {
 .animate-shine {
   animation: shine var(--duration, 14s) infinite linear;
 }
+
+
+/* ──────────────────────────────────────────────────────────────
+   Фоллбэк для СТАРЫХ браузеров без поддержки aspect-ratio
+   (старый iOS Safari < 15, встроенные webview мессенджеров).
+   Там контейнеры с aspect-* схлопывались в нулевую высоту —
+   обложки/баннеры пропадали. Здесь восстанавливаем пропорции
+   через padding и растягиваем картинку на весь контейнер.
+   На современных браузерах этот блок игнорируется. */
+@supports not (aspect-ratio: 1 / 1) {
+  .aspect-square,
+  .aspect-video,
+  .aspect-\[3\/4\],
+  .aspect-\[16\/9\],
+  .aspect-\[21\/9\],
+  .md\:aspect-\[21\/9\] { position: relative; }
+
+  .aspect-square::before      { content: ""; display: block; padding-top: 100%; }
+  .aspect-video::before       { content: ""; display: block; padding-top: 56.25%; }
+  .aspect-\[3\/4\]::before    { content: ""; display: block; padding-top: 133.333%; }
+  .aspect-\[16\/9\]::before   { content: ""; display: block; padding-top: 56.25%; }
+  .aspect-\[21\/9\]::before   { content: ""; display: block; padding-top: 42.857%; }
+
+  .aspect-square > img,  .aspect-square img,
+  .aspect-video > img,   .aspect-video img,
+  .aspect-\[3\/4\] img,
+  .aspect-\[16\/9\] img,
+  .aspect-\[21\/9\] img {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+}

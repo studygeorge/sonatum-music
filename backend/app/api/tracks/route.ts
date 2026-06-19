@@ -26,7 +26,8 @@ export async function POST(request: NextRequest) {
         releaseDate,
         audioType,
         instrumentalUrl,
-        instrumentalPrice
+        instrumentalPrice,
+        isExplicit,
       } = body;
 
       // Permissive: проставляем разумные дефолты вместо отказа.
@@ -88,7 +89,8 @@ export async function POST(request: NextRequest) {
           instrumentalPrice:
             instrumentalPrice !== undefined && instrumentalPrice !== null && instrumentalPrice !== ''
               ? Number(instrumentalPrice)
-              : null
+              : null,
+          isExplicit: !!isExplicit,
         }
       });
 

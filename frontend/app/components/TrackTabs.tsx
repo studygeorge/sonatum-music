@@ -134,7 +134,7 @@ export default function TrackTabs({ track, isPremium, isSheetOnly = false }: Tra
                   {track.sheetMusic.instrument && <p className="text-[11px] mt-0.5 text-[var(--text-secondary)]">{track.sheetMusic.instrument} {track.sheetMusic.difficulty ? `· ${track.sheetMusic.difficulty}` : ''}</p>}
                 </div>
                 <a href={track.sheetMusic.pdfUrl} target="_blank" rel="noreferrer" className="text-[12px] font-medium text-[var(--accent)] hover:opacity-80 px-4 py-2 rounded-lg bg-black/5 hover:bg-black/10 transition-colors">
-                  ⬇ Скачать
+                  <span className="inline-flex items-center gap-1.5"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" /></svg>Скачать</span>
                 </a>
               </div>
               {/* PDF viewer trigger */}

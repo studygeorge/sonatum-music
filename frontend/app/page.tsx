@@ -4,7 +4,7 @@ import HomeTracksGrid from './components/home/HomeTracksGrid';
 import HomeChart from './components/home/HomeChart';
 import HomeReleases from './components/home/HomeReleases';
 import HomeEvents from './components/home/HomeEvents';
-import HeroPlayButton from './components/home/HeroPlayButton';
+import HeroCarousel from './components/home/HeroCarousel';
 import PremiumPromo from './components/home/PremiumPromo';
 
 // Кэш SSR: 60 сек ISR — главная редко меняется, БД задеваем раз в минуту.
@@ -46,47 +46,14 @@ export default async function HomePage() {
 
   return (
     <main className="min-h-screen pt-4 md:pt-16 pb-12 px-6 md:px-12 max-w-7xl mx-auto space-y-8 md:space-y-16 overflow-x-hidden w-full">
-      <section
-        className="relative rounded-3xl overflow-hidden p-10 md:p-14 text-white min-h-[340px] flex items-center"
-        style={{
-          background:
-            'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)',
-        }}
-      >
-        <div
-          className="absolute top-0 right-0 w-96 h-96 rounded-full blur-3xl opacity-35"
-          style={{ background: '#3a78dc', transform: 'translate(30%, -30%)' }}
-        />
-        <div
-          className="absolute bottom-0 left-1/3 w-80 h-80 rounded-full blur-3xl opacity-30"
-          style={{ background: '#e84545', transform: 'translateY(40%)' }}
-        />
-
-        <div className="relative z-10 max-w-2xl">
-          <h1 className="text-white text-4xl md:text-5xl lg:text-6xl font-bold mb-6 tracking-tight">
-            Откройте для себя богатство духовной музыки
-          </h1>
-          <p className="text-lg text-white/80 mb-8 max-w-xl">
-            Исследуйте редкие звоны, старинные распевы и народные традиции. Все в безупречном качестве.
-          </p>
-          <div className="flex flex-wrap gap-4">
-            <HeroPlayButton
-              tracks={[
-                ...(data?.personalMix || []),
-                ...(data?.chart || []),
-                ...(data?.radar || []),
-                ...(data?.newReleases || []),
-              ]}
-            />
-            <Link
-              href="/catalog"
-              className="bg-white/10 backdrop-blur-md text-white px-8 py-4 rounded-full font-semibold hover:bg-white/20 transition-colors duration-300 border border-white/20"
-            >
-              Каталог
-            </Link>
-          </div>
-        </div>
-      </section>
+      <HeroCarousel
+        tracks={[
+          ...(data?.personalMix || []),
+          ...(data?.chart || []),
+          ...(data?.radar || []),
+          ...(data?.newReleases || []),
+        ]}
+      />
 
       {data?.personalMix?.length > 0 && (
         <HomeTracksGrid
@@ -124,12 +91,14 @@ export default async function HomePage() {
 
       <HomeEvents events={events} />
 
+      {/* Раздел «Новинки» объединён с «Новые релизы» выше. Радар-треки
+          теперь идут в «Радар талантов» (треки с малым числом прослушиваний). */}
       {data?.radar?.length > 0 && (
         <HomeTracksGrid
-          title="Новинки"
+          title="Радар талантов"
           tracks={data.radar}
           cols={6}
-          rightLink={{ href: '/catalog?sort=fresh', label: 'Все новинки' }}
+          rightLink={{ href: '/catalog?sort=radar', label: 'Все треки радара' }}
         />
       )}
 
@@ -186,17 +155,27 @@ export default async function HomePage() {
       {/* Поддержка Фонда содействия инновациям */}
       <section className="mt-8 md:mt-12">
         <div className="apple-card p-5 md:p-6 flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
-          <img
-            src="/partners/fasie.svg"
-            alt="Фонд содействия инновациям"
-            className="h-16 md:h-20 w-auto shrink-0 select-none"
-            loading="lazy"
-          />
+          <div className="flex items-center gap-4 md:gap-6 shrink-0">
+            <img
+              src="/partners/fasie.png"
+              alt="Фонд содействия инновациям"
+              className="h-16 md:h-20 w-auto select-none"
+              loading="lazy"
+            />
+            <img
+              src="/partners/platforma.svg"
+              alt="Платформа университетского технологического предпринимательства"
+              className="h-16 md:h-20 w-auto select-none"
+              loading="lazy"
+            />
+          </div>
           <p className="text-sm md:text-base text-[var(--text-secondary)] leading-snug">
-            Проект создан при поддержке{" "}
+            Проект реализован при поддержке{" "}
             <span className="font-semibold text-[var(--text-primary)]">
               Фонда содействия инновациям
-            </span>
+            </span>{" "}
+            в рамках программы «Студенческий стартап» мероприятия «Платформа университетского
+            технологического предпринимательства» федерального проекта «Технологии».
           </p>
         </div>
       </section>

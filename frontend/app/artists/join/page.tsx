@@ -174,7 +174,7 @@ export default function BecomeAuthorPage() {
         className="relative rounded-3xl overflow-hidden p-8 md:p-12 text-white mb-8 md:mb-12"
         style={{
           background:
-            'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)',
+            'linear-gradient(135deg, #1d4cb8 0%, #2f9e8f 55%, #e6e6e6 100%)',
         }}>
         <div className="relative z-10 max-w-2xl">
           <div className="text-xs uppercase tracking-widest font-semibold mb-3 opacity-90">
@@ -401,25 +401,31 @@ export default function BecomeAuthorPage() {
                   </p>
                   <div className="grid gap-2">
                     {[
-                      { v: 'LEGAL_ENTITY', l: 'Юридическое лицо' },
-                      { v: 'SOLE_PROP', l: 'ИП' },
-                      { v: 'SELF_EMPLOYED', l: 'Самозанятый-представитель' },
+                      { v: 'LEGAL_ENTITY', l: 'Юридическое лицо', disabled: true },
+                      { v: 'SOLE_PROP', l: 'ИП', disabled: true },
+                      { v: 'SELF_EMPLOYED', l: 'Самозанятый-представитель', disabled: false },
                     ].map((o) => (
                       <label
                         key={o.v}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-colors ${
-                          payeeType === o.v
-                            ? 'border-[var(--text-primary)] bg-[var(--hover)]'
-                            : 'border-[var(--border)] hover:bg-[var(--hover)]'
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
+                          o.disabled
+                            ? 'border-[var(--border)] opacity-60 cursor-not-allowed'
+                            : payeeType === o.v
+                              ? 'border-[var(--text-primary)] bg-[var(--hover)] cursor-pointer'
+                              : 'border-[var(--border)] hover:bg-[var(--hover)] cursor-pointer'
                         }`}>
                         <input
                           type="radio"
                           name="payee"
+                          disabled={o.disabled}
                           checked={payeeType === o.v}
-                          onChange={() => setPayeeType(o.v as PayeeType)}
+                          onChange={() => !o.disabled && setPayeeType(o.v as PayeeType)}
                           className="accent-[var(--text-primary)]"
                         />
-                        <span className="text-sm">{o.l}</span>
+                        <span className="text-sm flex-1">{o.l}</span>
+                        {o.disabled && (
+                          <span className="text-[10px] text-[var(--text-secondary)]">скоро</span>
+                        )}
                       </label>
                     ))}
                   </div>

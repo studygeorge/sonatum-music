@@ -37,7 +37,7 @@ DB = dict(
     port=5432,
     dbname="sonatum_music",
     user="sonatum_user",
-    password="Sonatum_Music_2026_Strong_Pass",
+    password=os.getenv("PGPASSWORD",""),
 )
 DATA_DIR = "/opt/sonatum/data"
 AUDIO_DIR = os.path.join(DATA_DIR, "audio", "import")

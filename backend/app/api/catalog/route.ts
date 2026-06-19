@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const isFree = searchParams.get('isFree') === 'true';
     const isForSale = searchParams.get('isForSale') === 'true';
     
-    // Динамические фильтры (JSON metadata и колонки)
+    // Динамические фильтры (отдельные колонки + JSON metadata fallback)
     const confession = searchParams.get('confession');
     const language = searchParams.get('language');
     const era = searchParams.get('era') || searchParams.get('eraId');
@@ -38,7 +38,20 @@ export async function GET(request: NextRequest) {
     const instruments = searchParams.get('instruments');
     const style = searchParams.get('style');
     const regionFilter = searchParams.get('regionFilter');
-    
+
+    // Новые фильтры из ТЗ
+    const difficulty = searchParams.get('difficulty');         // BEGINNER / INTERMEDIATE / ADVANCED
+    const tempo = searchParams.get('tempo');                   // SLOW / MEDIUM / FAST
+    const bpmMin = searchParams.get('bpmMin') ? parseInt(searchParams.get('bpmMin')!) : undefined;
+    const bpmMax = searchParams.get('bpmMax') ? parseInt(searchParams.get('bpmMax')!) : undefined;
+    const yearMin = searchParams.get('yearMin') ? parseInt(searchParams.get('yearMin')!) : undefined;
+    const yearMax = searchParams.get('yearMax') ? parseInt(searchParams.get('yearMax')!) : undefined;
+    const hasSheets = searchParams.get('hasSheets') === 'true';
+    const hasLyrics = searchParams.get('hasLyrics') === 'true';
+    const hasMinus = searchParams.get('hasMinus') === 'true';
+    const chantType = searchParams.get('chantType');
+    const serviceType = searchParams.get('serviceType');
+
     const sortBy = searchParams.get('sortBy') || 'releaseDate';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     
@@ -90,28 +103,70 @@ export async function GET(request: NextRequest) {
       where.AND.push({ isForSale: true });
     }
 
-    // Применение динамических фильтров для колонок
+    // Колонки tracks-таблицы (приоритет, т.к. индексированы)
     if (confession) where.AND.push({ confession });
     if (language) where.AND.push({ language });
-    if (era) where.AND.push({ eraId: era });
-    
-    // Применение JSON-метаданных:
+    if (era) where.AND.push({ OR: [{ eraId: era }, { era }] });
+    if (mood) where.AND.push({ mood });
+    if (difficulty && ['BEGINNER', 'INTERMEDIATE', 'ADVANCED'].includes(difficulty)) {
+      where.AND.push({ difficulty });
+    }
+    if (tempo && ['SLOW', 'MEDIUM', 'FAST'].includes(tempo)) {
+      where.AND.push({ tempo });
+    }
+    if (chantType) where.AND.push({ chantType });
+    if (serviceType) where.AND.push({ serviceType });
+
+    // BPM-диапазон
+    if (bpmMin !== undefined || bpmMax !== undefined) {
+      const cond: any = {};
+      if (bpmMin !== undefined) cond.gte = bpmMin;
+      if (bpmMax !== undefined) cond.lte = bpmMax;
+      where.AND.push({ bpm: cond });
+    }
+
+    // Диапазон годов (releaseDate или recording_year)
+    if (yearMin !== undefined || yearMax !== undefined) {
+      const conds: any[] = [];
+      if (yearMin !== undefined) {
+        conds.push({ releaseDate: { gte: new Date(yearMin, 0, 1) } });
+      }
+      if (yearMax !== undefined) {
+        conds.push({ releaseDate: { lt: new Date(yearMax + 1, 0, 1) } });
+      }
+      conds.forEach((c) => where.AND.push(c));
+    }
+
+    // Наличие нот / текста / минусовки
+    if (hasSheets) {
+      where.AND.push({ sheetMusic: { isNot: null } } as any);
+    }
+    if (hasLyrics) {
+      where.AND.push({ NOT: { lyrics: null } });
+    }
+    if (hasMinus) {
+      where.AND.push({ instrumentalUrl: { not: '' } });
+    }
+
+    // Инструменты (массив строк в колонке instruments или метадате)
+    if (instruments) {
+      // Колонка instruments — jsonb массив, делаем raw условие
+      where.AND.push({
+        OR: [
+          { instruments: { array_contains: instruments } as any },
+          { metadata: { path: ['instruments'], array_contains: [instruments] } },
+        ],
+      });
+    }
+
+    // Остальные — JSON-метаданные (legacy)
     if (recordingFormat) where.AND.push({ metadata: { path: ['format'], equals: recordingFormat } });
     if (choirType) where.AND.push({ metadata: { path: ['choirType'], equals: choirType } });
     if (performanceStyle) where.AND.push({ metadata: { path: ['performanceStyle'], equals: performanceStyle } });
     if (subcategory) where.AND.push({ metadata: { path: ['subcategory'], equals: subcategory } });
-    if (mood) where.AND.push({ metadata: { path: ['mood'], equals: mood } });
     if (theme) where.AND.push({ metadata: { path: ['theme'], equals: theme } });
     if (style) where.AND.push({ metadata: { path: ['style'], equals: style } });
     if (regionFilter) where.AND.push({ metadata: { path: ['region'], equals: regionFilter } });
-    
-    // Инструменты в виде массива в JSON: используем фильтрацию по строке, если Prisma не может искать внутри массивов jsonb
-    // Если нужно строго, то array_contains не работает напрямую в equals. Мы можем использовать array_contains в Prisma >= 4, если поддерживается
-    if (instruments) {
-      where.AND.push({
-        metadata: { path: ['instruments'], array_contains: [instruments] }
-      });
-    }
 
     if (priceMin !== undefined || priceMax !== undefined) {
       const priceCondition: any = {};

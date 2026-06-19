@@ -21,6 +21,16 @@ type Playlist = {
   slug?: string;
 };
 
+type Track = {
+  id: string;
+  title: string;
+  slug: string;
+  cover?: string | null;
+  plays?: number;
+  artist?: { name?: string | null; slug?: string | null } | null;
+  likedAt?: string;
+};
+
 type PublicProfile = {
   id: string;
   username: string;
@@ -35,6 +45,10 @@ type PublicProfile = {
   favoriteComposers?: string[];
   isPrivate?: boolean;
   createdAt?: string;
+  topTracks?: Track[];
+  currentlyLiking?: Track;
+  followingCount?: number;
+  isPremium?: boolean;
 };
 
 export default function PublicUserPage() {
@@ -163,6 +177,60 @@ export default function PublicUserPage() {
         </section>
       )}
 
+      {/* Сейчас нравится — виджет последнего лайка */}
+      {profile.currentlyLiking && (
+        <section className="mb-8">
+          <div className="apple-card p-5 flex items-center gap-4">
+            <div className="text-red-500 shrink-0" title="Сейчас нравится" aria-label="Сейчас нравится">
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+            </div>
+            <Link
+              href={`/tracks/${profile.currentlyLiking.slug}`}
+              className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity">
+              {profile.currentlyLiking.cover ? (
+                <img src={profile.currentlyLiking.cover} alt="" className="w-12 h-12 rounded-lg object-cover" />
+              ) : (
+                <div className="w-12 h-12 rounded-lg bg-black/[0.06] flex items-center justify-center text-[var(--text-secondary)]"><svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg></div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-sm truncate">{profile.currentlyLiking.title}</div>
+                <div className="text-xs text-[var(--text-secondary)] truncate">
+                  {profile.currentlyLiking.artist?.name || '—'}
+                </div>
+              </div>
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {/* Топ-5 треков за месяц */}
+      {profile.topTracks && profile.topTracks.length > 0 && (
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold tracking-tight mb-4">Топ-5 треков за месяц</h2>
+          <ol className="space-y-1.5">
+            {profile.topTracks.map((t, i) => (
+              <li key={t.id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-black/[0.03]">
+                <span className="text-sm font-bold text-[var(--text-secondary)] w-6 tabular-nums">{i + 1}</span>
+                {t.cover ? (
+                  <img src={t.cover} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-black/[0.06] flex items-center justify-center text-xs">♪</div>
+                )}
+                <Link href={`/tracks/${t.slug}`} className="flex-1 min-w-0 hover:opacity-80 transition-opacity">
+                  <div className="font-semibold text-sm truncate">{t.title}</div>
+                  <div className="text-xs text-[var(--text-secondary)] truncate">{t.artist?.name || '—'}</div>
+                </Link>
+                <span className="text-xs text-[var(--text-secondary)] tabular-nums whitespace-nowrap">
+                  {t.plays} прослушиваний
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
       {/* Музыкальная идентичность */}
       {(profile.favoriteGenres?.length || profile.favoriteEras?.length || profile.favoriteComposers?.length) && (
         <section className="mb-12">
@@ -192,7 +260,7 @@ export default function PublicUserPage() {
                   {p.cover ? (
                     <img src={p.cover} alt={p.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-[#0039a6] to-[#d52b1e]" />
+                    <div className="w-full h-full bg-gradient-to-br from-[#0039a6] to-[#2f9e8f]" />
                   )}
                 </div>
                 <h3 className="font-semibold truncate">{p.title}</h3>

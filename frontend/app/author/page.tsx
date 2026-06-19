@@ -63,7 +63,10 @@ export default function AuthorOverviewPage() {
   // Редактирование основных полей (имя/регион/город/bio)
   const [editing, setEditing] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [form, setForm] = useState({ name: '', region: '', city: '', bio: '' });
+  const [form, setForm] = useState({
+    name: '', region: '', city: '', bio: '',
+    vk: '', telegram: '', website: '', youtube: '', instagram: '',
+  });
   const [regions, setRegions] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
@@ -83,11 +86,17 @@ export default function AuthorOverviewPage() {
 
   const openEdit = () => {
     if (!me?.artist) return;
+    const sl = (me.artist.socialLinks || {}) as any;
     setForm({
       name: me.artist.name || '',
       region: me.artist.region || '',
       city: me.artist.city || '',
       bio: me.artist.bio || '',
+      vk: sl.vk || '',
+      telegram: sl.telegram || '',
+      website: sl.website || '',
+      youtube: sl.youtube || '',
+      instagram: sl.instagram || '',
     });
     setEditing(true);
   };
@@ -108,6 +117,13 @@ export default function AuthorOverviewPage() {
           bio: form.bio,
           region: form.region,
           city: form.city,
+          socialLinks: {
+            vk: form.vk.trim() || undefined,
+            telegram: form.telegram.trim() || undefined,
+            website: form.website.trim() || undefined,
+            youtube: form.youtube.trim() || undefined,
+            instagram: form.instagram.trim() || undefined,
+          },
         }),
       });
       await reload();
@@ -146,7 +162,7 @@ export default function AuthorOverviewPage() {
     <div className="space-y-6 animate-fadeInUp">
       <section
         className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white flex items-center gap-5"
-        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)' }}>
+        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #2f9e8f 55%, #e6e6e6 100%)' }}>
         {/* Аватарка-кнопка в шапке: клик → выбор файла → загрузка */}
         <label
           className="group relative w-20 h-20 md:w-24 md:h-24 rounded-full bg-white/10 border-2 border-white/30 overflow-hidden shrink-0 flex items-center justify-center text-3xl font-bold text-white/80 cursor-pointer hover:bg-white/20 transition-colors"
@@ -189,10 +205,9 @@ export default function AuthorOverviewPage() {
           )}
         </div>
       </section>
-      <div className="grid sm:grid-cols-3 gap-3">
+      <div className="grid sm:grid-cols-2 gap-3">
         <StatCard label="Треков" value={me.stats.tracksCount} />
         <StatCard label="Доход с лицензий" value={`${Math.round(me.stats.totalSales).toLocaleString('ru-RU')} ₽`} />
-        <StatCard label="Донаты" value={`${Math.round(me.stats.totalDonations).toLocaleString('ru-RU')} ₽`} />
       </div>
       <section>
         <div className="flex items-end justify-between mb-4">
@@ -334,6 +349,50 @@ export default function AuthorOverviewPage() {
                   className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none resize-none"
                 />
               </div>
+
+              {/* Соцсети */}
+              <div className="pt-3 border-t border-gray-200">
+                <div className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-3">Соцсети и ссылки</div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">ВКонтакте</label>
+                    <input
+                      value={form.vk}
+                      onChange={(e) => setForm({ ...form, vk: e.target.value })}
+                      placeholder="https://vk.com/your-page"
+                      className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Telegram</label>
+                    <input
+                      value={form.telegram}
+                      onChange={(e) => setForm({ ...form, telegram: e.target.value })}
+                      placeholder="@username или https://t.me/username"
+                      className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">YouTube</label>
+                    <input
+                      value={form.youtube}
+                      onChange={(e) => setForm({ ...form, youtube: e.target.value })}
+                      placeholder="https://youtube.com/@channel"
+                      className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Сайт</label>
+                    <input
+                      value={form.website}
+                      onChange={(e) => setForm({ ...form, website: e.target.value })}
+                      placeholder="https://example.com"
+                      className="w-full px-3 py-2 rounded-xl border border-gray-300 bg-white text-sm focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
@@ -358,7 +417,6 @@ export default function AuthorOverviewPage() {
                 <Info label="Регион" value={me.artist.region || '—'} />
                 <Info label="Город" value={me.artist.city || '—'} />
                 <Info label="Подписчики" value={me.artist.followers ?? 0} />
-                <Info label="Верифицирован" value={me.artist.verified ? 'Да' : 'Нет'} />
               </div>
               {me.artist.bio && (
                 <p className="text-sm text-gray-700 mt-3 whitespace-pre-wrap">{me.artist.bio}</p>
@@ -394,7 +452,6 @@ export default function AuthorOverviewPage() {
             } />
             <Info label="Регион" value={me.collective.region || '—'} />
             <Info label="ИНН" value={me.collective.legal_inn || '—'} />
-            <Info label="Верифицирован" value={me.collective.verified ? 'Да' : 'Нет'} />
           </div>
         </section>
       )}

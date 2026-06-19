@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '@/app/lib/api';
 
+import { toast } from '@/app/components/Toast';
 export default function GroupsPage() {
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,7 +40,7 @@ export default function GroupsPage() {
       setNewGroupName('');
       fetchGroups();
     } else {
-      alert(res.error || 'Ошибка создания группы');
+      toast.error(res.error || 'Ошибка создания группы');
     }
   };
 
@@ -58,7 +59,7 @@ export default function GroupsPage() {
       });
       fetchGroups();
     } else {
-      alert(res.error || 'Пользователь не найден или уже в группе');
+      toast.error(res.error || 'Пользователь не найден или уже в группе');
     }
   };
 

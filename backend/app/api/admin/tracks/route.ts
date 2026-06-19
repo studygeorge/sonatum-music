@@ -81,10 +81,45 @@ export async function GET(request: NextRequest) {
         console.log('[ADMIN TRACKS GET] Track artistIds:', tracks.map(t => t.artistId));
       }
 
+      // === ПРОФИ-приоритет: тегируем треки авторов с активной ПРОФИ-подпиской ===
+      // (треки PROFI-авторов идут в начале списка для приоритетной модерации до 3 дней)
+      const userIds = Array.from(new Set(tracks.map((t: any) => t.artist?.user?.email ? (t as any).artist?.userId : undefined).filter(Boolean))) as string[];
+      // userId недоступен в этом select-е, выберем заново через одну query
+      const trackUserIds = await prisma.$queryRawUnsafe<Array<{ id: string; user_id: string }>>(
+        `SELECT t.id, a."userId" AS user_id
+           FROM tracks t JOIN artists a ON a.id = t."artistId"
+          WHERE t.id = ANY($1::text[])`,
+        tracks.map(t => t.id)
+      );
+      const trackUserMap = new Map<string, string>();
+      for (const row of trackUserIds) trackUserMap.set(row.id, row.user_id);
+
+      const allUserIds = Array.from(new Set(Array.from(trackUserMap.values())));
+      const profiSet = new Set<string>();
+      if (allUserIds.length > 0) {
+        const profis = await prisma.$queryRawUnsafe<Array<{ user_id: string }>>(
+          `SELECT user_id FROM author_subscriptions
+            WHERE tier='PROFI' AND status='ACTIVE' AND user_id = ANY($1::text[])
+              AND (ends_at IS NULL OR ends_at > now())`,
+          allUserIds
+        );
+        for (const p of profis) profiSet.add(p.user_id);
+      }
+
+      const tracksWithProfi = tracks.map(t => ({
+        ...t,
+        isProfiAuthor: profiSet.has(trackUserMap.get(t.id) || ''),
+      }));
+
+      // Если фильтр PENDING — PROFI вперёд
+      const finalTracks = status === 'PENDING'
+        ? tracksWithProfi.sort((a, b) => (b.isProfiAuthor ? 1 : 0) - (a.isProfiAuthor ? 1 : 0))
+        : tracksWithProfi;
+
       return NextResponse.json({
         success: true,
         data: {
-          tracks,
+          tracks: finalTracks,
           pagination: {
             page,
             limit,

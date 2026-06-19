@@ -110,16 +110,81 @@ export async function GET(request: NextRequest) {
     user.id
   )) as any[];
 
+  // === Разделение Авторские / Исполнительские по ТЗ ===
+  // Для COMPOSER → продажа оригиналов = авторские; продажа каверов = исполнительские
+  // Для PERFORMER → всё идёт в исполнительские
+  // Для BOTH → продажа оригиналов = и авторские, и исполнительские (две колонки)
+  const splitRows = (await prisma.$queryRawUnsafe(
+    `SELECT
+        COALESCE(t.content_type, 'ORIGINAL') AS ctype,
+        COUNT(*)::int AS sales,
+        SUM(lp.artist_amount)::numeric AS earned
+       FROM license_purchases lp
+       JOIN tracks t ON t.id = lp.track_id
+       JOIN artists a ON a.id = t."artistId"
+      WHERE a."userId" = $1 AND lp.status = 'PAID'
+        AND lp.paid_at > now() - interval '30 days'
+      GROUP BY ctype`,
+    user.id
+  )) as any[];
+
+  const earnedByType = new Map<string, { sales: number; earned: number }>();
+  for (const r of splitRows) {
+    earnedByType.set(String(r.ctype || 'ORIGINAL'), { sales: r.sales, earned: Number(r.earned || 0) });
+  }
+  const originalSales = earnedByType.get('ORIGINAL')?.sales || 0;
+  const originalEarn = earnedByType.get('ORIGINAL')?.earned || 0;
+  const coverSales = earnedByType.get('COVER')?.sales || 0;
+  const coverEarn = earnedByType.get('COVER')?.earned || 0;
+
+  const authorType = (user.artistProfile as any)?.authorType || 'BOTH';
+
+  // Разрезаем суммы по ТЗ
+  let composerEarnings = 0; // авторские
+  let performerEarnings = 0; // исполнительские
+  if (authorType === 'COMPOSER') {
+    composerEarnings = originalEarn;
+    performerEarnings = coverEarn; // если каверы есть — это исполнение
+  } else if (authorType === 'PERFORMER') {
+    performerEarnings = originalEarn + coverEarn;
+  } else {
+    // BOTH — для оригиналов 100% — это и авторское, и исполнительское (видим как две колонки одного и того же поступления)
+    composerEarnings = originalEarn;
+    performerEarnings = originalEarn + coverEarn;
+  }
+
   return NextResponse.json(
     {
       success: true,
       data: {
         balance,
         availableForWithdrawal: extras?.payout_enabled ? balance : 0,
+        accountKind: extras?.account_kind || 'SOLO',
+        authorType,
         totals: {
           totalLicenseEarned: Number(totals?.total_license_earned || 0),
           totalDonations: Number(totals?.total_donations || 0),
           totalLicenseCount: Number(totals?.total_license_count || 0),
+        },
+        // Разделение Авторские / Исполнительские (ТЗ)
+        split: {
+          composer: {
+            originalSales,
+            originalEarn,
+            total: composerEarnings,
+          },
+          performer: {
+            coverSales,
+            coverEarn,
+            originalSales: authorType === 'BOTH' || authorType === 'PERFORMER' ? originalSales : 0,
+            originalEarn: authorType === 'BOTH' || authorType === 'PERFORMER' ? originalEarn : 0,
+            total: performerEarnings,
+          },
+          donations: Number(totals?.total_donations || 0),
+          // Примечание: для BOTH суммы по «оригиналам» дублируются в composer и performer — это аналитика, не двойная выплата
+          note: authorType === 'BOTH'
+            ? 'Для полнотворческого проекта продажа оригинала отображается одновременно как авторская и исполнительская часть. Деньги поступают одной суммой на ваш баланс — разделение нужно только для аналитики.'
+            : null,
         },
         breakdown: breakdown.map((b) => ({
           licenseCode: b.license_code,

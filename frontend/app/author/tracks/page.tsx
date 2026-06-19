@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { authStorage } from '@/app/lib/auth';
 
+import { toast } from '@/app/components/Toast';
 type Track = {
   id: string;
   title: string;
@@ -206,6 +207,38 @@ function AuthorTracksPageInner() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    {/* Быстрый тоггл «Снять с продажи / Вернуть в продажу» — для опубликованных треков */}
+                    {t.status === 'PUBLISHED' && (
+                      <button
+                        onClick={async () => {
+                          const newVal = !t.isForSale;
+                          const confirmMsg = newVal
+                            ? 'Снова выставить трек на продажу?'
+                            : 'Снять трек с продажи? Покупатели больше не увидят кнопку «Купить» — например, если вы продали исключительные права.';
+                          if (!confirm(confirmMsg)) return;
+                          try {
+                            const token = authStorage.getToken();
+                            const r = await fetch(`/api/author/tracks/${t.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                              body: JSON.stringify({ isForSale: newVal }),
+                            });
+                            const j = await r.json();
+                            if (j.success) load();
+                            else toast.error(j.error || 'Не удалось изменить статус продажи');
+                          } catch (e: any) {
+                            toast.error(e?.message || 'Ошибка');
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hidden sm:block ${
+                          t.isForSale
+                            ? 'bg-white border border-black text-black hover:bg-gray-100'
+                            : 'bg-white border border-[var(--border)] text-[var(--text-primary)] hover:bg-gray-50'
+                        }`}
+                        title={t.isForSale ? 'Скрыть кнопку «Купить» для этого трека' : 'Включить продажу'}>
+                        {t.isForSale ? 'Снять с продажи' : 'Вернуть в продажу'}
+                      </button>
+                    )}
                     <button
                       onClick={() => setExpandedId(expanded ? null : t.id)}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
@@ -800,10 +833,6 @@ function EditTrackInline({
           <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
             <input type="checkbox" checked={isFree} onChange={(e) => setIsFree(e.target.checked)} className="accent-black" />
             Бесплатно
-          </label>
-          <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
-            <input type="checkbox" checked={allowDonations} onChange={(e) => setAllowDonations(e.target.checked)} className="accent-black" />
-            Принимать донаты
           </label>
           <label className="flex items-center gap-2 text-sm text-gray-900 cursor-pointer">
             <input type="checkbox" checked={allowExclusive} onChange={(e) => setAllowExclusive(e.target.checked)} className="accent-black" />

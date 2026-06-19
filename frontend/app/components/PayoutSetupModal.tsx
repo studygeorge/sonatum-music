@@ -1,7 +1,18 @@
 'use client';
+import Portal from '@/app/components/Portal';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { authStorage } from '@/app/lib/auth';
+
+type Eligibility = {
+  canSetupPayout: boolean;
+  allConditionsMet: boolean;
+  conditions: {
+    accountAge: { ok: boolean; daysLeft: number; required: string; accountAgeDays: number };
+    tracks: { ok: boolean; tracksLeft: number; required: string; publishedTracks: number };
+    selfEmployed: { ok: boolean; required: string; hint: string };
+  };
+};
 
 export default function PayoutSetupModal({
   onClose,
@@ -10,11 +21,22 @@ export default function PayoutSetupModal({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [tin, setTin] = useState('');
   const [sbpPhone, setSbpPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [eligibility, setEligibility] = useState<Eligibility | null>(null);
+  const [loadingElig, setLoadingElig] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/author/payout/eligibility', {
+      headers: { Authorization: `Bearer ${authStorage.getToken() || ''}` },
+    })
+      .then((r) => r.json())
+      .then((j) => { if (j.success) setEligibility(j.data); })
+      .finally(() => setLoadingElig(false));
+  }, []);
 
   const submit = async () => {
     setError('');
@@ -42,8 +64,9 @@ export default function PayoutSetupModal({
   };
 
   return (
+    <Portal>
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md"
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/45 backdrop-blur-md"
       onClick={() => !submitting && onClose()}>
       <div
         className="apple-card max-w-lg w-full p-6 shadow-2xl animate-fadeInUp"
@@ -52,7 +75,7 @@ export default function PayoutSetupModal({
           <div>
             <h3 className="text-xl font-bold tracking-tight">Подключение выплат</h3>
             <p className="text-xs text-[var(--text-secondary)] mt-1">
-              Шаг {step} из 3
+              {step === 0 ? 'Проверка условий' : `Шаг ${step} из 3`}
             </p>
           </div>
           <button onClick={onClose} className="text-2xl leading-none text-[var(--text-secondary)]">
@@ -60,21 +83,76 @@ export default function PayoutSetupModal({
           </button>
         </div>
         {/* Прогресс */}
-        <div className="flex items-center justify-center gap-2 mb-5">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center gap-2">
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                  step>= s ? 'bg-[var(--text-primary)] text-white' : 'bg-[var(--border)] text-[var(--text-secondary)]'
-                }`}>
-                {s}
+        {step > 0 && (
+          <div className="flex items-center justify-center gap-2 mb-5">
+            {[1, 2, 3].map((s) => (
+              <div key={s} className="flex items-center gap-2">
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                    step >= s ? 'bg-[var(--text-primary)] text-white' : 'bg-[var(--border)] text-[var(--text-secondary)]'
+                  }`}>
+                  {s}
+                </div>
+                {s < 3 && (
+                  <div className={`w-8 h-px ${step > s ? 'bg-[var(--text-primary)]' : 'bg-[var(--border)]'}`} />
+                )}
               </div>
-              {s < 3 && (
-                <div className={`w-8 h-px ${step> s ? 'bg-[var(--text-primary)]' : 'bg-[var(--border)]'}`} />
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
+
+        {/* ШАГ 0: Eligibility — проверка условий из ТЗ */}
+        {step === 0 && (
+          <>
+            {loadingElig ? (
+              <p className="text-sm text-[var(--text-secondary)] py-6 text-center">Проверяем условия…</p>
+            ) : !eligibility ? (
+              <p className="text-sm text-red-600 py-6">Не удалось загрузить статус. Попробуйте позже.</p>
+            ) : (
+              <>
+                <h4 className="font-semibold mb-1">Условия для подключения выплат</h4>
+                <p className="text-sm text-[var(--text-secondary)] mb-4">
+                  Чтобы выводить деньги, нужно выполнить 3 условия из правил платформы.
+                </p>
+                <ul className="space-y-3 mb-5">
+                  <ConditionRow
+                    ok={eligibility.conditions.accountAge.ok}
+                    title="Возраст аккаунта ≥ 3 месяцев"
+                    hint={eligibility.conditions.accountAge.ok
+                      ? `Выполнено (${eligibility.conditions.accountAge.accountAgeDays} дней с регистрации)`
+                      : `Осталось ~${Math.ceil(eligibility.conditions.accountAge.daysLeft / 30)} мес. (сейчас ${eligibility.conditions.accountAge.accountAgeDays} дней)`}
+                  />
+                  <ConditionRow
+                    ok={eligibility.conditions.tracks.ok}
+                    title="Не менее 3 опубликованных треков"
+                    hint={eligibility.conditions.tracks.ok
+                      ? `Выполнено (${eligibility.conditions.tracks.publishedTracks} треков)`
+                      : `Осталось загрузить ещё ${eligibility.conditions.tracks.tracksLeft} (сейчас ${eligibility.conditions.tracks.publishedTracks})`}
+                  />
+                  <ConditionRow
+                    ok={eligibility.conditions.selfEmployed.ok}
+                    title="Статус самозанятого"
+                    hint={eligibility.conditions.selfEmployed.ok
+                      ? 'Подтверждён'
+                      : eligibility.conditions.selfEmployed.hint}
+                  />
+                </ul>
+                <div className="flex justify-end gap-2">
+                  <button onClick={onClose} className="px-5 py-2.5 rounded-full bg-[var(--hover)] text-sm font-medium">
+                    Закрыть
+                  </button>
+                  <button
+                    onClick={() => setStep(1)}
+                    disabled={!eligibility.canSetupPayout}
+                    className="px-6 py-3 rounded-full bg-[var(--text-primary)] text-white font-medium text-sm disabled:opacity-40">
+                    {eligibility.canSetupPayout ? 'Продолжить' : 'Сначала выполните условия'}
+                  </button>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
         {step === 1 && (
           <>
             <h4 className="font-semibold mb-2">Подтверждение статуса самозанятого</h4>
@@ -162,5 +240,22 @@ export default function PayoutSetupModal({
         )}
       </div>
     </div>
+    </Portal>
+  );
+}
+
+function ConditionRow({ ok, title, hint }: { ok: boolean; title: string; hint: string }) {
+  return (
+    <li className="flex items-start gap-3 p-3 rounded-xl border border-[var(--border)]">
+      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+        ok ? 'bg-black text-white' : 'bg-white border-2 border-[var(--border)] text-[var(--text-secondary)]'
+      }`}>
+        {ok ? '✓' : '○'}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-semibold text-sm">{title}</div>
+        <div className="text-xs text-[var(--text-secondary)] mt-0.5">{hint}</div>
+      </div>
+    </li>
   );
 }

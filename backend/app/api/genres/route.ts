@@ -42,9 +42,7 @@ export async function GET(request: NextRequest) {
       {
         success: true,
         data: genres
-      },
-      { headers: corsHeaders }
-    );
+      }, { headers: { ...corsHeaders, 'Cache-Control': 's-maxage=3600, stale-while-revalidate=7200' } });
   } catch (error) {
     console.error('Genres API Error:', error);
     return NextResponse.json(

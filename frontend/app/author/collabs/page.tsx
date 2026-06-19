@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState, FormEvent } from 'react';
+import { useEffect, useRef, useState, FormEvent } from 'react';
 import { authStorage } from '@/app/lib/auth';
 
+import Portal from "@/app/components/Portal";
+import { toast } from '@/app/components/Toast';
 type Tab = 'BROWSE' | 'MINE' | 'INBOX' | 'ARCHIVE';
 
 const ROLES = [
@@ -40,6 +42,7 @@ export default function CollabsPage() {
   const [activeReq, setActiveReq] = useState<any | null>(null);
   const [filterRole, setFilterRole] = useState('');
   const [filterBudget, setFilterBudget] = useState('');
+  const [openChat, setOpenChat] = useState<null | { requestId: string; peerId: string; peerName: string }>(null);
   const [filterCity, setFilterCity] = useState('');
 
   const token = () => authStorage.getToken() || '';
@@ -95,7 +98,7 @@ export default function CollabsPage() {
     <div className="space-y-6 animate-fadeInUp">
       <section
         className="relative rounded-3xl overflow-hidden p-7 md:p-10 text-white flex items-end justify-between gap-4 flex-wrap"
-        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #d52b1e 55%, #e6e6e6 100%)' }}
+        style={{ background: 'linear-gradient(135deg, #1d4cb8 0%, #2f9e8f 55%, #e6e6e6 100%)' }}
       >
         <div className="relative z-10 max-w-xl">
           <div className="text-xs uppercase tracking-widest font-semibold mb-2 opacity-90">
@@ -265,12 +268,64 @@ export default function CollabsPage() {
                       <span className="text-xs text-[var(--text-secondary)] ml-auto">{fmtDate(m.createdAt)}</span>
                     </div>
                     <p className="text-sm mt-2 whitespace-pre-line">{m.body}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setOpenChat({ requestId: m.requestId, peerId: m.fromUserId, peerName: m.fromName })}
+                        className="px-4 py-1.5 rounded-full bg-[var(--text-primary)] text-white text-xs font-semibold">
+                        Ответить
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const reason = prompt('Опишите кратко суть жалобы:');
+                          if (!reason) return;
+                          const r = await fetch('/api/reports', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                            body: JSON.stringify({
+                              targetType: 'USER',
+                              targetId: m.fromUserId,
+                              reason: 'INAPPROPRIATE',
+                              comment: reason,
+                            }),
+                          });
+                          const j = await r.json();
+                          toast.error(j.success ? 'Жалоба отправлена администратору' : (j.error || 'Ошибка'));
+                        }}
+                        className="px-4 py-1.5 rounded-full bg-white border border-[var(--border)] text-[var(--text-primary)] text-xs font-semibold hover:bg-gray-100">
+                        Пожаловаться
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Заблокировать ${m.fromName}? Вы больше не будете получать его заявок и сообщений.`)) return;
+                          const r = await fetch('/api/users/me/blocks', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+                            body: JSON.stringify({ userId: m.fromUserId }),
+                          });
+                          const j = await r.json();
+                          if (j.success) { toast.error(j.message || 'Заблокирован'); loadAll(); }
+                          else toast.error(j.error || 'Ошибка');
+                        }}
+                        className="px-4 py-1.5 rounded-full bg-white border border-black text-black text-xs font-semibold hover:bg-gray-100">
+                        В чёрный список
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             ))}
           </div>
         )
+      )}
+
+      {openChat && (
+        <ChatDrawer
+          requestId={openChat.requestId}
+          peerId={openChat.peerId}
+          peerName={openChat.peerName}
+          isAuthor={true}
+          onClose={() => { setOpenChat(null); loadAll(); }}
+        />
       )}
 
       {tab === 'ARCHIVE' && (
@@ -492,5 +547,123 @@ function ReplySection({ req, onClose, onSent }: { req: any; onClose: () => void;
         </button>
       </div>
     </section>
+  );
+}
+
+function ChatDrawer({
+  requestId, peerId, peerName, isAuthor, onClose,
+}: {
+  requestId: string;
+  peerId: string;
+  peerName: string;
+  isAuthor: boolean;
+  onClose: () => void;
+}) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const token = () => authStorage.getToken() || '';
+
+  const load = async () => {
+    try {
+      const r = await fetch(`/api/collabs/${requestId}/messages`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const j = await r.json();
+      if (j.success) {
+        const filtered = (j.data || []).filter((m: any) =>
+          m.fromUserId === peerId || m.toUserId === peerId
+        );
+        setMessages(filtered);
+        setTimeout(() => { listRef.current?.scrollTo(0, listRef.current.scrollHeight); }, 50);
+      }
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, [requestId, peerId]);
+
+  const send = async () => {
+    if (!text.trim()) return;
+    setError(null);
+    setSending(true);
+    try {
+      const url = isAuthor
+        ? `/api/collabs/${requestId}/messages?peer=${encodeURIComponent(peerId)}`
+        : `/api/collabs/${requestId}/messages`;
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ body: text.trim() }),
+      });
+      const j = await r.json();
+      if (j.success) {
+        setText('');
+        await load();
+      } else {
+        setError(j.error || 'Не удалось отправить');
+      }
+    } finally { setSending(false); }
+  };
+
+  return (
+<Portal>
+    <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/45 backdrop-blur-md" onClick={onClose}>
+      <div
+        className="bg-white w-full sm:max-w-lg sm:rounded-3xl shadow-2xl flex flex-col"
+        style={{ maxHeight: '85vh', height: '85vh' }}
+        onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+          <div>
+            <div className="font-bold text-sm">Чат с {peerName}</div>
+            <div className="text-[11px] text-[var(--text-secondary)]">Внутренние сообщения по заявке</div>
+          </div>
+          <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-2xl leading-none px-2">×</button>
+        </div>
+
+        <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-2.5">
+          {loading ? (
+            <p className="text-sm text-[var(--text-secondary)] text-center">Загрузка…</p>
+          ) : messages.length === 0 ? (
+            <p className="text-sm text-[var(--text-secondary)] text-center">Пока сообщений нет. Напишите первое.</p>
+          ) : messages.map((m) => {
+            const own = m.fromUserId !== peerId;
+            return (
+              <div key={m.id} className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[78%] px-3 py-2 rounded-2xl text-sm ${
+                  own ? 'bg-[var(--text-primary)] text-white rounded-br-md' : 'bg-[var(--hover)] text-[var(--text-primary)] rounded-bl-md'
+                }`}>
+                  <div className="whitespace-pre-wrap break-words">{m.body}</div>
+                  <div className={`text-[10px] mt-1 ${own ? 'text-white/60' : 'text-[var(--text-secondary)]'}`}>
+                    {new Date(m.createdAt).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {error && <div className="mx-4 mb-2 p-2 rounded-lg bg-red-50 text-xs text-red-700">{error}</div>}
+
+        <div className="p-3 border-t border-[var(--border)] flex gap-2 items-end">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(); } }}
+            rows={2}
+            placeholder="Ваше сообщение… (Cmd/Ctrl+Enter — отправить)"
+            className="flex-1 px-3 py-2 rounded-xl border border-[var(--border)] focus:border-black focus:outline-none text-sm resize-none"
+          />
+          <button onClick={send} disabled={sending || !text.trim()}
+            className="px-5 py-2.5 rounded-full bg-[var(--text-primary)] text-white text-sm font-semibold disabled:opacity-60 whitespace-nowrap">
+            {sending ? '…' : 'Отправить'}
+          </button>
+        </div>
+      </div>
+    </div>
+</Portal>
   );
 }

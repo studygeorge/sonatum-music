@@ -4,6 +4,8 @@ import { AuthService } from '@/lib/auth';
 import { getCorsHeaders } from '@/lib/cors';
 import { init as tinkoffInit } from '@/lib/tinkoff';
 
+import { checkRateLimit, rateLimitResponse } from '@/lib/ratelimit';
+import { logError } from '@/lib/errors';
 export const dynamic = 'force-dynamic';
 const SITE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sonatum-music.ru';
 
@@ -21,6 +23,8 @@ export async function OPTIONS(request: NextRequest) {
 // POST /api/donations/init
 // Body: { artistSlug?, collectiveSlug?, amount, message?, email? }
 export async function POST(request: NextRequest) {
+  const _rl = checkRateLimit('donate', request, { max: 10, windowSec: 60 });
+  if (!_rl.ok) return rateLimitResponse(_rl, request) as any;
   const cors = getCorsHeaders(request.headers.get('origin') || undefined);
   try {
     let body: any;
@@ -98,18 +102,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Комиссия платформы на донаты — 10%
+    const DONATION_FEE_PCT = 10;
+    const commissionAmount = Math.round((amount * DONATION_FEE_PCT) / 100 * 100) / 100;
+    const recipientAmount = Math.round((amount - commissionAmount) * 100) / 100;
+
     const donId = cuid();
     await prisma.$executeRawUnsafe(
       `INSERT INTO donations
-       (id, donor_id, donor_nickname, recipient_artist_id, recipient_collective_id, amount, message, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING')`,
+       (id, donor_id, donor_nickname, recipient_artist_id, recipient_collective_id,
+        amount, message, status, commission_pct, commission_amount, recipient_amount)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING', $8, $9, $10)`,
       donId,
       donorId,
       donorNickname,
       recipientArtistId,
       recipientCollectiveId,
       amount,
-      body.message || null
+      body.message || null,
+      DONATION_FEE_PCT,
+      commissionAmount,
+      recipientAmount
     );
 
     const orderId = `don_${donId}_${Date.now()}`;
@@ -122,20 +135,16 @@ export async function POST(request: NextRequest) {
       email: donorEmail,
       successUrl: `${SITE_URL}/donate-success?id=${donId}`,
       failUrl: `${SITE_URL}/donate-fail?id=${donId}`,
+      notificationUrl: `${SITE_URL}/api/payments/tinkoff/notify`,
       receipt: {
-        items: [
-          {
-            name: description.substring(0, 128),
-            quantity: 1,
-            amount: amountKopecks,
-            price: amountKopecks,
-            tax: 'none',
-            paymentMethod: 'full_payment',
-            paymentObject: 'service',
-          },
-        ],
+        items: [{
+          name: description.substring(0, 128),
+          priceKopecks: amountKopecks,
+          quantity: 1,
+        }],
+        taxation: 'usn_income',
       },
-    } as any);
+    });
 
     if (!r?.ok || !r.paymentUrl) {
       return NextResponse.json(
@@ -157,7 +166,7 @@ export async function POST(request: NextRequest) {
       { headers: cors }
     );
   } catch (e: any) {
-    console.error('[DONATE_INIT_ERR]', e);
+    logError('donations.init', e, { request, extra: { tag: 'DONATE_INIT_ERR' } }).catch(()=>{}); console.error('[DONATE_INIT_ERR]', e);
     return NextResponse.json(
       { success: false, error: e?.message || 'Ошибка' },
       { status: 500, headers: cors }

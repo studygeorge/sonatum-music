@@ -12,6 +12,7 @@ import LicenseMarketplace from './LicenseMarketplace';
 import { Plus, Check, Flag } from 'lucide-react';
 import { PremiumModal } from '@/components/PremiumModal';
 
+import { toast } from '@/app/components/Toast';
 export default function TrackPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { playTrack, dislikeTrack, currentTrack } = usePlayer();
@@ -65,15 +66,17 @@ export default function TrackPage({ params }: { params: { id: string } }) {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Get user for premium check
+        // Get user for premium check — только ACTIVE подписка с не истёкшим endDate
         const userRes = await api.getMe();
         if (userRes.success && userRes.data) {
           setUser(userRes.data);
-          setIsPremium(
-            userRes.data?.subscription?.tier === 'PREMIUM' || 
-            userRes.data?.subscription?.tier === 'STUDENT' || 
-            userRes.data?.role === 'ADMIN'
-          );
+          const sub = userRes.data?.subscription;
+          const subActive =
+            !!sub &&
+            sub.status === 'ACTIVE' &&
+            (sub.tier === 'PREMIUM' || sub.tier === 'STUDENT') &&
+            (!sub.endDate || new Date(sub.endDate).getTime() > Date.now());
+          setIsPremium(subActive || userRes.data?.role === 'ADMIN' || userRes.data?.role === 'SUPER_ADMIN');
         }
 
         // Fetch track — backend returns { data: { track, similarTracks } }
@@ -112,11 +115,11 @@ export default function TrackPage({ params }: { params: { id: string } }) {
     if (!reportReason) return;
     const res = await api.report(reportTarget.id, reportTarget.type, reportReason, reportDetails);
     if (res.success) {
-      alert('Ваша жалоба успешно отправлена на модерацию.');
+      toast.error('Ваша жалоба успешно отправлена на модерацию.');
       setReportModalOpen(false);
       setReportDetails('');
     } else {
-      alert(res.error || 'Ошибка отправки');
+      toast.error(res.error || 'Ошибка отправки');
     }
   };
 
@@ -185,7 +188,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                     className="px-8 py-3 rounded-full text-[15px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold"
                     onClick={() => playTrack(track as any)}
                   >
-                     ▶ Слушать
+                     <span className="inline-flex items-center gap-1.5"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>Слушать</span>
                   </button>
                 ) : isSheetOnly && track.sheetMusic?.pdfUrl ? (
                   isPremium ? (
@@ -198,7 +201,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                     </a>
                   ) : (
                     <button
-                      onClick={() => setPremiumOpen(true)}
+                      onClick={() => { window.location.href = "/profile?tab=subscription"; }}
                       className="px-8 py-3 rounded-full text-[15px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold">
                       Открыть ноты PDF · Premium
                     </button>
@@ -236,7 +239,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                   className="flex-1 py-3.5 rounded-2xl text-[15px] flex items-center justify-center gap-2 bg-[var(--text-primary)] text-white active:scale-95 transition-all shadow-sm font-bold"
                   onClick={() => playTrack(track as any)}
                 >
-                   ▶ Слушать
+                   <span className="inline-flex items-center gap-1.5"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>Слушать</span>
                 </button>
               ) : isSheetOnly && track.sheetMusic?.pdfUrl ? (
                 isPremium ? (
@@ -249,7 +252,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                   </a>
                 ) : (
                   <button
-                    onClick={() => setPremiumOpen(true)}
+                    onClick={() => { window.location.href = "/profile?tab=subscription"; }}
                     className="flex-1 py-3.5 rounded-2xl text-[15px] flex items-center justify-center gap-2 bg-[var(--text-primary)] text-white active:scale-95 transition-all shadow-sm font-bold">
                     Открыть ноты PDF · Premium
                   </button>
@@ -275,36 +278,59 @@ export default function TrackPage({ params }: { params: { id: string } }) {
            </div>
         </div>
         
-        {/* Минусовка (инструментальная версия) — ТЗ Сонатум */}
-        {track.audioType && track.audioType !== 'FULL' && track.instrumentalUrl && (
-          <div className="mb-8 apple-card p-5 bg-gradient-to-br from-[var(--hover)] to-white border border-[var(--border)]">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <h3 className="text-[15px] font-bold text-[#1c1c1e] mb-0.5">
-                  {track.audioType === 'INSTRUMENTAL' ? 'Этот трек — минусовка' : 'Доступна минусовка'}
-                </h3>
-                <p className="text-[13px] text-[var(--text-secondary)]">
-                  Инструментальная версия без вокала{track.instrumentalPrice ? ` · ${Number(track.instrumentalPrice).toLocaleString('ru-RU')} ₽` : ''}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  className="px-5 py-2.5 rounded-full text-[14px] bg-[#e8e6e1] text-[#1c1c1e] hover:bg-[#dfdcd5] transition-colors font-bold"
-                  onClick={() => playTrack({ ...track, audioUrl: track.instrumentalUrl } as any)}
-                >
-                  ▶ Прослушать минусовку
-                </button>
-                {track.instrumentalPrice && Number(track.instrumentalPrice) > 0 && (
+        {/* Выбор версии — полная / минусовка. Согласно ТЗ:
+            «Минусовка доступна только при покупке. Она не проигрывается на сайте.» */}
+        {hasInstrumental && track.audioType && track.audioType !== 'FULL' && (
+          <div className="mb-8 apple-card p-5 md:p-6">
+            <h3 className="text-[15px] font-bold text-[#1c1c1e] mb-1">Версии трека</h3>
+            <p className="text-[12px] text-[var(--text-secondary)] mb-4">
+              Минусовка доступна только при покупке — она не воспроизводится на сайте.
+            </p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {/* Полная версия */}
+              {track.audioType === 'BOTH' && (
+                <div className="rounded-2xl border border-[var(--border)] bg-white p-4 flex flex-col">
+                  <div className="flex items-baseline justify-between mb-1">
+                    <span className="text-[13px] font-bold text-[#1c1c1e]">Полная версия</span>
+                    {(track.price || 0) > 0 && (
+                      <span className="text-[14px] font-black tabular-nums">{Number(track.price || 0).toLocaleString('ru-RU')} ₽</span>
+                    )}
+                    {!track.price && <span className="text-[11px] text-[var(--text-secondary)]">бесплатно</span>}
+                  </div>
+                  <p className="text-[11px] text-[var(--text-secondary)] mb-3 flex-1">С вокалом, как в записи</p>
                   <button
-                    className="px-5 py-2.5 rounded-full text-[14px] bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors font-bold"
-                    onClick={() => {
-                      const el = document.getElementById('license-marketplace');
-                      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }}
+                    className="px-4 py-2 rounded-full text-[12px] font-bold bg-[var(--text-primary)] text-white hover:opacity-90 transition-opacity"
+                    onClick={() => playTrack(track as any)}
                   >
-                    Купить за {Number(track.instrumentalPrice).toLocaleString('ru-RU')} ₽
+                    <span className="inline-flex items-center gap-1.5"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>Слушать</span>
                   </button>
-                )}
+                </div>
+              )}
+              {/* Минусовка */}
+              <div className="rounded-2xl border border-black bg-white p-4 flex flex-col">
+                <div className="flex items-baseline justify-between mb-1">
+                  <span className="text-[13px] font-bold text-[#1c1c1e]">Минусовка (инструментал)</span>
+                  {track.instrumentalPrice && Number(track.instrumentalPrice) > 0 ? (
+                    <span className="text-[14px] font-black tabular-nums">{Number(track.instrumentalPrice).toLocaleString('ru-RU')} ₽</span>
+                  ) : (
+                    <span className="text-[11px] text-[var(--text-secondary)]">по запросу</span>
+                  )}
+                </div>
+                <p className="text-[11px] text-[var(--text-secondary)] mb-3 flex-1">Без вокала, для каверов и исполнения</p>
+                <button
+                  className="px-4 py-2 rounded-full text-[12px] font-bold bg-[var(--text-primary)] text-white hover:opacity-90 transition-opacity"
+                  onClick={() => {
+                    // Сначала прокручиваем к маркетплейсу, чтобы пользователь видел модалку,
+                    // и одним кадром позже открываем модалку MINUS-лицензии.
+                    const el = document.getElementById('license-marketplace');
+                    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setTimeout(() => {
+                      window.dispatchEvent(new CustomEvent('sonatum:open-license', { detail: { code: 'MINUS' } }));
+                    }, 200);
+                  }}
+                >
+                  Купить минусовку
+                </button>
               </div>
             </div>
           </div>
@@ -373,7 +399,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                     className="px-6 py-2.5 rounded-full text-[14px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold"
                     onClick={() => playTrack(track as any)}
                   >
-                     ▶ Слушать
+                     <span className="inline-flex items-center gap-1.5"><svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>Слушать</span>
                   </button>
                 ) : isSheetOnly && track.sheetMusic?.pdfUrl ? (
                   isPremium ? (
@@ -386,7 +412,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
                     </a>
                   ) : (
                     <button
-                      onClick={() => setPremiumOpen(true)}
+                      onClick={() => { window.location.href = "/profile?tab=subscription"; }}
                       className="px-6 py-2.5 rounded-full text-[14px] flex items-center gap-2 bg-[var(--text-primary)] text-white hover:opacity-90 transition-colors shadow-sm font-bold">
                       Открыть · Premium
                     </button>
@@ -434,7 +460,7 @@ export default function TrackPage({ params }: { params: { id: string } }) {
             <h3 className="text-2xl font-black mb-4 tracking-tight text-[#1c1c1e]">Текст</h3>
             <div className="text-gray-500 font-medium text-[15px] leading-relaxed mb-10 relative">
                <div className={`relative whitespace-pre-line ${lyricsExpanded ? '' : 'max-h-24 overflow-hidden'}`}>
-                  {track.lyrics || "Текст отсутствует...\nМы скоро добавим его,\nТолько для вас."}
+                  {track.lyrics || "Текст отсутствует."}
                   {!lyricsExpanded && (track.lyrics?.length || 0) > 100 && (
                     <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#EAE8E3]/90 to-transparent backdrop-blur-[1px]"></div>
                   )}

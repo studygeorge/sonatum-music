@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { AuthService } from '@/lib/auth';
 import { getCorsHeaders } from '@/lib/cors';
+import { getSubLevel, FREE_LIMITS } from '@/lib/subscription';
 
 const TRACK_SELECT = {
   id: true,
@@ -58,6 +59,16 @@ export async function GET(request: NextRequest) {
     const fallbackSince = new Date(Date.now() - 90 * 86_400_000);
     const discoveriesSince = new Date(Date.now() - 30 * 86_400_000);
 
+    // Free-лимит истории прослушиваний: 7 дней (по ТЗ).
+    // Premium/Student/Admin — без ограничений.
+    let historySince: Date | null = null;
+    if (userId) {
+      const sub = await getSubLevel(userId);
+      if (!sub.isPremium) {
+        historySince = new Date(Date.now() - FREE_LIMITS.HISTORY_DAYS * 86_400_000);
+      }
+    }
+
     // Все 7 запросов параллельно вместо последовательно (~5x ускорение API).
     const [
       historyActivities,
@@ -70,7 +81,10 @@ export async function GET(request: NextRequest) {
     ] = await Promise.all([
       userId
         ? prisma.trackActivity.findMany({
-            where: { userId },
+            where: {
+              userId,
+              ...(historySince ? { createdAt: { gte: historySince } } : {}),
+            },
             orderBy: { createdAt: 'desc' },
             take: 10,
             select: {
@@ -80,13 +94,13 @@ export async function GET(request: NextRequest) {
           })
         : Promise.resolve([] as Array<{ trackId: string; track: any }>),
       prisma.track.findMany({
-        where: { status: 'PUBLISHED' },
+        where: { status: 'PUBLISHED', audioUrl: { not: '' } },
         orderBy: [{ releaseDate: 'desc' }, { createdAt: 'desc' }],
         take: 10,
         select: TRACK_SELECT,
       }),
       prisma.track.findMany({
-        where: { status: 'PUBLISHED' },
+        where: { status: 'PUBLISHED', audioUrl: { not: '' } },
         orderBy: { playCount: 'desc' },
         take: 10,
         select: TRACK_SELECT,
@@ -98,13 +112,17 @@ export async function GET(request: NextRequest) {
         select: PLAYLIST_SELECT,
       }),
       prisma.track.findMany({
-        where: { status: 'PUBLISHED' },
+        where: { status: 'PUBLISHED', audioUrl: { not: '' } },
         orderBy: { likeCount: 'desc' },
         take: 10,
         select: TRACK_SELECT,
       }),
       prisma.track.findMany({
-        where: { status: 'PUBLISHED', createdAt: { gte: recentSince } },
+        where: {
+          status: 'PUBLISHED',
+          createdAt: { gte: recentSince },
+          audioUrl: { not: '' },
+        },
         orderBy: [{ likeCount: 'desc' }, { playCount: 'desc' }],
         take: 12,
         select: TRACK_SELECT,
@@ -142,7 +160,11 @@ export async function GET(request: NextRequest) {
     let radar = radarFresh;
     if (radar.length === 0) {
       radar = await prisma.track.findMany({
-        where: { status: 'PUBLISHED', createdAt: { gte: fallbackSince } },
+        where: {
+          status: 'PUBLISHED',
+          createdAt: { gte: fallbackSince },
+          audioUrl: { not: '' },
+        },
         orderBy: [{ likeCount: 'desc' }, { createdAt: 'desc' }],
         take: 12,
         select: TRACK_SELECT,

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withRole } from '@/lib/middleware';
 import { prisma } from '@/lib/prisma';
+import { sendMail } from '@/lib/mailer';
+
+const SITE_URL = process.env.SITE_URL || 'https://sonatum-music.ru';
 
 // Отклонить трек
 export async function POST(
@@ -48,6 +51,30 @@ export async function POST(
           }
         }
       });
+
+      const email = (updated as any).artist?.user?.email;
+      if (email) {
+        sendMail({
+          to: email,
+          subject: `Трек «${updated.title}» отклонён модерацией · Сонатум`,
+          html: `
+            <div style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;max-width:560px;margin:0 auto;padding:32px;color:#1c1c1e;">
+              <h1 style="font-size:22px;margin:0 0 16px;">Трек не прошёл модерацию</h1>
+              <p style="font-size:15px;line-height:1.6;">
+                Ваш трек <b>«${updated.title}»</b> отклонён модерацией.
+              </p>
+              <div style="background:#fee2e2;border-radius:12px;padding:16px;margin:16px 0;">
+                <div style="font-size:12px;color:#991b1b;margin-bottom:6px;">Причина:</div>
+                <div style="font-size:14px;color:#991b1b;">${reason}</div>
+              </div>
+              <p style="font-size:14px;line-height:1.6;">Вы можете отредактировать трек и отправить его на модерацию повторно.</p>
+              <a href="${SITE_URL}/profile?tab=uploads" style="display:inline-block;background:#1c1c1e;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;font-size:14px;margin-top:16px;">
+                Мои загрузки
+              </a>
+            </div>
+          `,
+        }).catch((e) => console.error('[MAIL reject]', e));
+      }
 
       return NextResponse.json({
         success: true,
